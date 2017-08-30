@@ -1,201 +1,73 @@
 <?php
-/*
- *  Based on some work of autoptimize plugin
+/* 
+ *  Based on some work of autoptimize plugin 
  */
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-} // Exit if accessed directly
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
 abstract class Breeze_MinificationBase {
-
-	protected $content    = '';
+	protected $content = '';
 	protected $tagWarning = false;
-	protected $cdn_url    = '';
-
-	public function __construct( $content ) {
+	
+	public function __construct($content) {
 		$this->content = $content;
 	}
-
+	
 	//Reads the page and collects tags
-	abstract public function read( $justhead );
-
+	abstract public function read($justhead);
+	
 	//Joins and optimizes collected things
 	abstract public function minify();
-
+	
 	//Caches the things
 	abstract public function cache();
-
+	
 	//Returns the content
 	abstract public function getcontent();
-
-	protected function decode_asset_url( $url ) {
-		$decoded = $url;
-		$passes  = 0;
-
-		while ( false !== strpos( $decoded, '%' ) && $passes < 5 ) {
-			$next = urldecode( $decoded );
-			if ( $next === $decoded ) {
-				return $decoded;
-			}
-
-			$decoded = $next;
-			++$passes;
-		}
-
-		// Fail closed when more decoding would still alter the URL.
-		if ( $passes >= 5 && urldecode( $decoded ) !== $decoded ) {
-			return null;
-		}
-
-		return $decoded;
-	}
-
-	protected function asset_url_traverses( $url ) {
-		if ( false !== strpos( $url, "\0" ) ) {
-			return true;
-		}
-
-		$path = parse_url( $url, PHP_URL_PATH ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- Raw asset URL; wp_parse_url() reads some relative URLs (such as "/a:80") differently.
-		if ( ! is_string( $path ) ) {
-			return false;
-		}
-
-		// Reject encoded parent segments and encoded separators before decoding.
-		if ( 1 === preg_match( '/\.\.(%2f|%5c)|%2e%2e/i', $path ) ) {
-			return true;
-		}
-
-		return null === $this->strip_dot_segments( $path );
-	}
-
-	/**
-	 * Remove current-directory segments and reject parent-directory segments.
-	 *
-	 * Backslashes are treated as separators because PHP accepts them as path
-	 * separators on Windows. Empty segments are discarded so repeated slashes
-	 * cannot obscure a parent segment.
-	 *
-	 * @param string $path URL path or path left after removing the root URL.
-	 * @return string|null Normalized path, or null when the path is unsafe.
-	 */
-	protected function strip_dot_segments( $path ) {
-		if ( false !== strpos( $path, "\0" ) ) {
-			return null;
-		}
-
-		$path        = str_replace( '\\', '/', $path );
-		$has_leading = ( 0 === strpos( $path, '/' ) );
-		$segments    = explode( '/', $path );
-		$safe        = array();
-
-		foreach ( $segments as $segment ) {
-			if ( '' === $segment || '.' === $segment ) {
-				continue;
-			}
-
-			if ( '..' === $segment ) {
-				return null;
-			}
-
-			$safe[] = $segment;
-		}
-
-		$normalized = implode( '/', $safe );
-		if ( $has_leading ) {
-			$normalized = '/' . $normalized;
-		}
-
-		return $normalized;
-	}
-
-	protected function path_is_inside_root( $path ) {
-		global $wp_plugin_paths;
-
-		$resolved = realpath( $path );
-
-		if ( false === $resolved || ! is_file( $resolved ) ) {
-			return false;
-		}
-
-		$resolved_slash = str_replace( '\\', '/', $resolved ) . '/';
-		$roots          = array( BREEZE_ROOT_DIR, WP_CONTENT_DIR, get_stylesheet_directory(), get_template_directory() );
-		$roots          = apply_filters( 'breeze_minification_allowed_roots', array_merge( $roots, (array) $wp_plugin_paths ) );
-
-		foreach ( (array) $roots as $root ) {
-			$root = is_string( $root ) ? realpath( $root ) : false;
-
-			// Never allow a filesystem root such as / or C:\.
-			if ( false === $root || dirname( $root ) === $root ) {
-				continue;
-			}
-
-			$root_prefix = rtrim( str_replace( '\\', '/', $root ), '/' ) . '/';
-
-			// Windows paths are case-insensitive, while Unix paths are not.
-			$inside = ( '\\' === DIRECTORY_SEPARATOR ) ? 0 === stripos( $resolved_slash, $root_prefix ) : 0 === strpos( $resolved_slash, $root_prefix );
-			if ( $inside ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
+	
 	//Converts an URL to a full path
-	protected function getpath( $url ) {
-		$url = apply_filters( 'breeze_filter_cssjs_alter_url', $url );
-
-		if ( ! is_string( $url ) || '' === $url ) {
-			return false;
+	protected function getpath($url) {
+		$url=apply_filters( 'breeze_filter_cssjs_alter_url', $url);
+		
+		if (strpos($url,'%')!==false) {
+			$url=urldecode($url);
 		}
-
-		// Check both representations so encoded traversal cannot survive.
-		if ( $this->asset_url_traverses( $url ) ) {
-			return false;
-		}
-
-		$decoded_url = $this->decode_asset_url( $url );
-		if ( ! is_string( $decoded_url ) || $this->asset_url_traverses( $decoded_url ) ) {
-			return false;
-		}
-		$url = $decoded_url;
 
 		// normalize
-		if ( strpos( $url, '//' ) === 0 ) {
-			if ( is_ssl() ) {
-				$url = 'https:' . $url;
+		if (strpos($url,'//')===0) {
+			if (is_ssl()) {
+				$url = "https:".$url;
 			} else {
-				$url = 'http:' . $url;
+				$url = "http:".$url;
 			}
-		} elseif ( ( strpos( $url, '//' ) === false ) && ( strpos( $url, wp_parse_url( breeze_WP_SITE_URL, PHP_URL_HOST ) ) === false ) ) {
-			$url = breeze_WP_SITE_URL . $url;
+		} else if ((strpos($url,'//')===false) && (strpos($url,parse_url(breeze_WP_SITE_URL,PHP_URL_HOST))===false)) {
+			$url = breeze_WP_SITE_URL.$url;
 		}
 
 		// first check; hostname wp site should be hostname of url
-		$thisHost = @parse_url( $url, PHP_URL_HOST ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- The URL can still be relative here; wp_parse_url() reads some relative URLs differently.
-		if ( $thisHost !== wp_parse_url( breeze_WP_SITE_URL, PHP_URL_HOST ) ) {
-			/*
+		$thisHost=@parse_url($url,PHP_URL_HOST);
+		if ($thisHost!==parse_url(breeze_WP_SITE_URL,PHP_URL_HOST)) {
+			/* 
 			* first try to get all domains from WPML (if available)
 			* then explicitely declare $this->cdn_url as OK as well
 			* then apply own filter autoptimize_filter_cssjs_multidomain takes an array of hostnames
 			* each item in that array will be considered part of the same WP multisite installation
 			*/
 			$multidomains = array();
-
-			$multidomainsWPML = apply_filters( 'wpml_setting', array(), 'language_domains' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WPML's own filter.
-			if ( ! empty( $multidomainsWPML ) ) {
-				$multidomains = array_map( array( $this, 'ao_getDomain' ), $multidomainsWPML );
+			
+			$multidomainsWPML = apply_filters('wpml_setting', array(), 'language_domains');
+			if (!empty($multidomainsWPML)) {
+				$multidomains = array_map(array($this,"ao_getDomain"),$multidomainsWPML);
 			}
-
-			if ( ! empty( $this->cdn_url ) ) {
-				$multidomains[] = parse_url( $this->cdn_url, PHP_URL_HOST ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- The CDN URL is stored as "//host" when saved without a scheme; wp_parse_url() reads those differently.
+			
+			if (!empty($this->cdn_url)) {
+				$multidomains[]=parse_url($this->cdn_url,PHP_URL_HOST);
 			}
-
-			$multidomains = apply_filters( 'breeze_filter_cssjs_multidomain', $multidomains );
-
-			if ( ! empty( $multidomains ) ) {
-				if ( in_array( $thisHost, $multidomains ) ) {
-					$url = str_replace( $thisHost, wp_parse_url( breeze_WP_SITE_URL, PHP_URL_HOST ), $url );
+			
+			$multidomains = apply_filters('breeze_filter_cssjs_multidomain', $multidomains);
+			
+			if (!empty($multidomains)) {
+				if (in_array($thisHost,$multidomains)) {
+					$url=str_replace($thisHost, parse_url(breeze_WP_SITE_URL,PHP_URL_HOST), $url);
 				} else {
 					return false;
 				}
@@ -203,170 +75,159 @@ abstract class Breeze_MinificationBase {
 				return false;
 			}
 		}
-
+		
 		// try to remove "wp root url" from url while not minding http<>https
-		$tmp_ao_root = preg_replace( '/https?/', '', breeze_WP_ROOT_URL );
-		$tmp_url     = preg_replace( '/https?/', '', $url );
-		$path        = str_replace( $tmp_ao_root, '', $tmp_url );
-
+		$tmp_ao_root = preg_replace('/https?/','',breeze_WP_ROOT_URL);
+		$tmp_url = preg_replace('/https?/','',$url);
+		$path = str_replace($tmp_ao_root,'',$tmp_url);
+		
 		// final check; if path starts with :// or //, this is not a URL in the WP context and we have to assume we can't aggregate
-		if ( preg_match( '#^:?//#', $path ) ) {
-			/** External script/css (adsense, etc) */
+		if (preg_match('#^:?//#',$path)) {
+         		/** External script/css (adsense, etc) */
 			return false;
-		}
+       		}
 
-		$path = $this->strip_dot_segments( $path );
-		if ( ! is_string( $path ) ) {
-			return false;
-		}
-
-		$path = str_replace( '//', '/', BREEZE_ROOT_DIR . $path );
-		if ( ! $this->path_is_inside_root( $path ) ) {
-			return false;
-		}
-
-		return $path;
+        	$path = str_replace('//','/',BREEZE_ROOT_DIR.$path);
+        	return $path;
 	}
 
 	// needed for WPML-filter
-	protected function ao_getDomain( $in ) {
-		// make sure the url starts with something vaguely resembling a protocol
-		if ( ( strpos( $in, 'http' ) !== 0 ) && ( strpos( $in, '//' ) !== 0 ) ) {
-			$in = 'http://' . $in;
-		}
-
-		// do the actual parse_url
-		$out = parse_url( $in, PHP_URL_HOST ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- The domain may start with "//"; wp_parse_url() reads those differently.
-
-		// fallback if parse_url does not understand the url is in fact a url
-		if ( empty( $out ) ) {
-			$out = $in;
-		}
-
+	protected function ao_getDomain($in) {
+        // make sure the url starts with something vaguely resembling a protocol
+        if ((strpos($in,"http")!==0) && (strpos($in,"//")!==0)) {
+            $in="http://".$in;
+        }
+        
+        // do the actual parse_url
+		$out = parse_url($in,PHP_URL_HOST);
+        
+        // fallback if parse_url does not understand the url is in fact a url
+		if (empty($out)) $out=$in;
+        
 		return $out;
 	}
 
 
 	// logger
-	protected function ao_logger( $logmsg, $appendHTML = true ) {
-		if ( $appendHTML ) {
-			$logmsg         = '<!--noptimize--><!-- ' . $logmsg . ' --><!--/noptimize-->';
-			$this->content .= $logmsg;
+	protected function ao_logger($logmsg,$appendHTML=true) {
+		if ($appendHTML) {
+			$logmsg="<!--noptimize--><!-- ".$logmsg." --><!--/noptimize-->";
+			$this->content.=$logmsg;
 		} else {
-			error_log( 'Error: ' . $logmsg ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Only when the caller asks for the error log instead of an HTML comment.
+			error_log("Error: ".$logmsg);
 		}
 	}
 
 	// hide everything between noptimize-comment tags
-	protected function hide_noptimize( $noptimize_in ) {
-		if ( preg_match( '/<!--\s?noptimize\s?-->/', $noptimize_in ) ) {
+	protected function hide_noptimize($noptimize_in) {
+		if ( preg_match( '/<!--\s?noptimize\s?-->/', $noptimize_in ) ) { 
 			$noptimize_out = preg_replace_callback(
 				'#<!--\s?noptimize\s?-->.*?<!--\s?/\s?noptimize\s?-->#is',
-				function ( $matches ) {
-					return '%%NOPTIMIZE' . breeze_HASH . '%%' . base64_encode( $matches[0] ) . '%%NOPTIMIZE%%';
-				},
+				create_function(
+					'$matches',
+					'return "%%NOPTIMIZE".breeze_HASH."%%".base64_encode($matches[0])."%%NOPTIMIZE%%";'
+				),
 				$noptimize_in
 			);
 		} else {
 			$noptimize_out = $noptimize_in;
 		}
-
 		return $noptimize_out;
 	}
-
+	
 	// unhide noptimize-tags
-	protected function restore_noptimize( $noptimize_in ) {
-		if ( strpos( $noptimize_in, '%%NOPTIMIZE%%' ) !== false ) {
+	protected function restore_noptimize($noptimize_in) {
+		if ( strpos( $noptimize_in, '%%NOPTIMIZE%%' ) !== false ) { 
 			$noptimize_out = preg_replace_callback(
-				'#%%NOPTIMIZE' . breeze_HASH . '%%(.*?)%%NOPTIMIZE%%#is',
-				function ( $matches ) {
-					return base64_decode( $matches[1] );
-				},
+				'#%%NOPTIMIZE'.breeze_HASH.'%%(.*?)%%NOPTIMIZE%%#is',
+				create_function(
+					'$matches',
+					'return base64_decode($matches[1]);'
+				),
 				$noptimize_in
 			);
 		} else {
 			$noptimize_out = $noptimize_in;
 		}
-
 		return $noptimize_out;
 	}
 
-	protected function hide_iehacks( $iehacks_in ) {
-		if ( strpos( $iehacks_in, '<!--[if' ) !== false ) {
+	protected function hide_iehacks($iehacks_in) {
+		if ( strpos( $iehacks_in, '<!--[if' ) !== false ) { 
 			$iehacks_out = preg_replace_callback(
 				'#<!--\[if.*?\[endif\]-->#is',
-				function ( $matches ) {
-					return '%%IEHACK' . breeze_HASH . '%%' . base64_encode( $matches[0] ) . '%%IEHACK%%';
-				},
+				create_function(
+					'$matches',
+					'return "%%IEHACK".breeze_HASH."%%".base64_encode($matches[0])."%%IEHACK%%";'
+				),
 				$iehacks_in
 			);
 		} else {
 			$iehacks_out = $iehacks_in;
 		}
-
 		return $iehacks_out;
 	}
 
-	protected function restore_iehacks( $iehacks_in ) {
-		if ( strpos( $iehacks_in, '%%IEHACK%%' ) !== false ) {
+	protected function restore_iehacks($iehacks_in) {
+		if ( strpos( $iehacks_in, '%%IEHACK%%' ) !== false ) { 
 			$iehacks_out = preg_replace_callback(
-				'#%%IEHACK' . breeze_HASH . '%%(.*?)%%IEHACK%%#is',
-				function ( $matches ) {
-					return base64_decode( $matches[1] );
-				},
+				'#%%IEHACK'.breeze_HASH.'%%(.*?)%%IEHACK%%#is',
+				create_function(
+					'$matches',
+					'return base64_decode($matches[1]);'
+				),
 				$iehacks_in
 			);
 		} else {
-			$iehacks_out = $iehacks_in;
+			$iehacks_out=$iehacks_in;
 		}
-
 		return $iehacks_out;
 	}
 
-	protected function hide_comments( $comments_in ) {
-		if ( strpos( $comments_in, '<!--' ) !== false ) {
-			$comments_out = preg_replace_callback(
-				'#<!--.*?-->#is',
-				function ( $matches ) {
-					return '%%COMMENTS' . breeze_HASH . '%%' . base64_encode( $matches[0] ) . '%%COMMENTS%%';
-				},
-				$comments_in
-			);
-		} else {
-			$comments_out = $comments_in;
-		}
+        protected function hide_comments($comments_in) {
+                if ( strpos( $comments_in, '<!--' ) !== false ) {
+                        $comments_out = preg_replace_callback(
+                                '#<!--.*?-->#is',
+                                create_function(
+                                        '$matches',
+                                        'return "%%COMMENTS".breeze_HASH."%%".base64_encode($matches[0])."%%COMMENTS%%";'
+                                ),
+                                $comments_in
+                        );
+                } else {
+                        $comments_out = $comments_in;
+                }
+                return $comments_out;
+        }
 
-		return $comments_out;
-	}
-
-	protected function restore_comments( $comments_in ) {
-		if ( strpos( $comments_in, '%%COMMENTS%%' ) !== false ) {
-			$comments_out = preg_replace_callback(
-				'#%%COMMENTS' . breeze_HASH . '%%(.*?)%%COMMENTS%%#is',
-				function ( $matches ) {
-					return base64_decode( $matches[1] );
-				},
-				$comments_in
-			);
-		} else {
-			$comments_out = $comments_in;
-		}
-
-		return $comments_out;
+        protected function restore_comments($comments_in) {
+                if ( strpos( $comments_in, '%%COMMENTS%%' ) !== false ) {
+                        $comments_out = preg_replace_callback(
+                                '#%%COMMENTS'.breeze_HASH.'%%(.*?)%%COMMENTS%%#is',
+                                create_function(
+                                        '$matches',
+                                        'return base64_decode($matches[1]);'
+                                ),
+                                $comments_in
+                        );
+                } else {
+                        $comments_out=$comments_in;
+                }
+                return $comments_out;
 	}
 
 	protected function url_replace_cdn( $url ) {
 		$cdn_url = apply_filters( 'breeze_filter_base_cdnurl', $this->cdn_url );
-		if ( ! empty( $cdn_url ) ) {
+		if ( !empty($cdn_url) )  {
 			// secondly prepend domain-less absolute URL's
 			if ( ( substr( $url, 0, 1 ) === '/' ) && ( substr( $url, 1, 1 ) !== '/' ) ) {
 				$url = rtrim( $cdn_url, '/' ) . $url;
 			} else {
-				// get WordPress base URL
-				$WPSiteBreakdown = wp_parse_url( breeze_WP_SITE_URL );
+				// get wordpress base URL
+				$WPSiteBreakdown = parse_url( breeze_WP_SITE_URL );
 				$WPBaseUrl       = $WPSiteBreakdown['scheme'] . '://' . $WPSiteBreakdown['host'];
 				if ( ! empty( $WPSiteBreakdown['port'] ) ) {
-					$WPBaseUrl .= ':' . $WPSiteBreakdown['port'];
+					$WPBaseUrl .= ":" . $WPSiteBreakdown['port'];
 				}
 				// three: replace full url's with scheme
 				$tmp_url = str_replace( $WPBaseUrl, rtrim( $cdn_url, '/' ), $url );
@@ -381,286 +242,79 @@ abstract class Breeze_MinificationBase {
 
 		// allow API filter to take alter after CDN replacement
 		$url = apply_filters( 'breeze_filter_base_replace_cdn', $url );
-
 		return $url;
 	}
 
-	protected function inject_in_html( $payload, $replaceTag ) {
-		if ( strpos( $this->content, $replaceTag[0] ) !== false ) {
-			if ( $replaceTag[1] === 'after' ) {
-				$replaceBlock = $replaceTag[0] . $payload;
-			} elseif ( $replaceTag[1] === 'replace' ) {
-				$replaceBlock = $payload;
+	protected function inject_in_html($payload,$replaceTag) {
+		if (strpos($this->content,$replaceTag[0])!== false) {
+			if ($replaceTag[1]==="after") {
+				$replaceBlock=$replaceTag[0].$payload;
+			} else if ($replaceTag[1]==="replace"){
+				$replaceBlock=$payload;
 			} else {
-				$replaceBlock = $payload . $replaceTag[0];
+				$replaceBlock=$payload.$replaceTag[0];
 			}
-			$this->content = substr_replace( $this->content, $replaceBlock, strpos( $this->content, $replaceTag[0] ), strlen( $replaceTag[0] ) );
+			$this->content = substr_replace($this->content,$replaceBlock,strpos($this->content,$replaceTag[0]),strlen($replaceTag[0]));
 		} else {
 			$this->content .= $payload;
-			if ( ! $this->tagWarning ) {
-				$this->content   .= '<!--noptimize--><!-- breeze found a problem with the HTML in your Theme, tag ' . $replaceTag[0] . ' missing --><!--/noptimize-->';
-				$this->tagWarning = true;
+			if (!$this->tagWarning) {
+				$this->content .= "<!--noptimize--><!-- breeze found a problem with the HTML in your Theme, tag ".$replaceTag[0]." missing --><!--/noptimize-->";
+				$this->tagWarning=true;
 			}
 		}
 	}
-
-	protected function isremovable( $tag, $removables ) {
-		foreach ( $removables as $match ) {
-			if ( strpos( $tag, $match ) !== false ) {
+	
+	protected function isremovable($tag, $removables) {
+		foreach ($removables as $match) {
+			if (strpos($tag,$match)!==false) {
 				return true;
 			}
 		}
-
 		return false;
 	}
+	
+    // inject already minified code in optimized JS/CSS
+    protected function inject_minified($in) {
+        if ( strpos( $in, '%%INJECTLATER%%' ) !== false ) {
+            $out = preg_replace_callback(
+                '#%%INJECTLATER'.breeze_HASH.'%%(.*?)%%INJECTLATER%%#is',
+                create_function(
+                    '$matches',
+                    '$filepath=base64_decode(strtok($matches[1],"|"));
+                    $filecontent=file_get_contents($filepath);
 
-	// inject already minified code in optimized JS/CSS
-	protected function inject_minified( $in ) {
-		if ( strpos( $in, '%%INJECTLATER%%' ) !== false ) {
-			$out = preg_replace_callback(
-				'#%%INJECTLATER' . breeze_HASH . '%%(.*?)%%INJECTLATER%%#is',
-				function ( $matches ) {
-					$filepath    = base64_decode( strtok( $matches[1], '|' ) );
-					$filecontent = file_get_contents( $filepath );
-					if ( empty( trim( $filecontent ) ) ) {
-						return '';
-					}
+                    // remove BOM
+                    $filecontent = preg_replace("#\x{EF}\x{BB}\x{BF}#","",$filecontent);
 
-					// remove BOM
-					$filecontent = preg_replace( "#\x{EF}\x{BB}\x{BF}#", '', $filecontent );
+                    // remove comments and blank lines
+                    if (substr($filepath,-3,3)===".js") {
+                        $filecontent=preg_replace("#^\s*\/\/.*$#Um","",$filecontent);
+                    }
 
-					// remove comments and blank lines
-					if ( substr( $filepath, -3, 3 ) === '.js' ) {
-						$filecontent = preg_replace( '#^\s*\/\/.*$#Um', '', $filecontent );
-					}
+                    $filecontent=preg_replace("#^\s*\/\*[^!].*\*\/\s?#Us","",$filecontent);
+                    $filecontent=preg_replace("#(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+#", "\n", $filecontent);
 
-					$filecontent = preg_replace( '#^\s*\/\*[^!].*\*\/\s?#Us', '', $filecontent );
-					$filecontent = preg_replace( "#(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+#", "\n", $filecontent );
+                    // specific stuff for JS-files
+                    if (substr($filepath,-3,3)===".js") {
+                        if ((substr($filecontent,-1,1)!==";")&&(substr($filecontent,-1,1)!=="}")) {
+                            $filecontent.=";";
+                        }
 
-					// specific stuff for JS-files
-					if ( substr( $filepath, -3, 3 ) === '.js' ) {
-						if ( ( substr( $filecontent, -1, 1 ) !== ';' ) && ( substr( $filecontent, -1, 1 ) !== '}' ) ) {
-							$filecontent .= ';';
-						}
+                        if (get_option("breeze_js_trycatch")==="on") {
+                            $filecontent="try{".$filecontent."}catch(e){}";
+                        }
+                    } else if ((substr($filepath,-4,4)===".css")) {
+                        $filecontent=Breeze_MinificationStyles::fixurls($filepath,$filecontent);
+                    }
 
-						if ( get_option( 'breeze_js_trycatch' ) === 'on' ) {
-							$filecontent = 'try{' . $filecontent . '}catch(e){}';
-						}
-					} elseif ( ( substr( $filepath, -4, 4 ) === '.css' ) ) {
-						$filecontent = Breeze_MinificationStyles::fixurls( $filepath, $filecontent );
-					}
-
-					// return
-					return "\n" . $filecontent;
-				},
-				$in
-			);
-		} else {
-			$out = $in;
-		}
-
-		return $out;
-	}
-
-	/**
-	 * Handles clear cache for the situation where cache files do not exist.
-	 * @since 1.1.3
-	 */
-	protected function clear_cache_data() {
-		//delete minify
-		Breeze_MinificationCache::clear_minification();
-		//clear normal cache
-		Breeze_PurgeCache::breeze_cache_flush( false, false, true );
-
-		//Breeze_PurgeCache::factory();
-		//clear varnish cache
-		$varnish_cache = new Breeze_PurgeVarnish();
-
-		// Honor the `is_network` flag only when the current user is operating
-		// at the network scope; otherwise scope the purge to the current site.
-		$network_requested = ( ! empty( $_POST['is_network'] ) && 'true' === $_POST['is_network'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Only widens the purge scope, and only together with the breeze_user_can_manage_network() check below.
-		$is_network        = is_network_admin() || ( $network_requested && function_exists( 'breeze_user_can_manage_network' ) && breeze_user_can_manage_network() );
-
-		if ( is_multisite() && $is_network ) {
-			$sites = get_sites( array( 'number' => 0 ) );
-			foreach ( $sites as $site ) {
-				switch_to_blog( $site->blog_id );
-				$homepage = home_url() . '/?breeze';
-				$varnish_cache->purge_cache( $homepage );
-				restore_current_blog();
-			}
-		} else {
-			$homepage = home_url() . '/?breeze';
-			$varnish_cache->purge_cache( $homepage );
-		}
-	}
-
-	/**
-	 * Helps to check if the cache file actually exists.
-	 *
-	 * @param string $file_path Full file path.
-	 *
-	 * @return bool
-	 * @since 1.1.3
-	 */
-	protected function is_cache_file_present( $file_path = '' ) {
-		if ( file_exists( $file_path ) ) {
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
-	 * Stamps a bundle this render links to as "used now".
-	 *
-	 * The stamp is the file's mtime and it is the only thing that keeps an
-	 * unchanged bundle alive through the post-purge cleanup, so a failure here
-	 * eventually costs the page the file it links to. It means the file itself
-	 * cannot be written by the user PHP runs as, which typically happens when
-	 * WP-CLI, a deploy script or another pool created it. Record it so an
-	 * administrator is told rather than left to find the 404s.
-	 *
-	 * @param string $file_path Full path of the bundle.
-	 *
-	 * @return void
-	 */
-	protected function mark_bundle_used( $file_path = '' ) {
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_touch -- Runs on front-end renders, where WP_Filesystem is not loaded and may need credentials.
-		if ( ! @touch( $file_path ) ) {
-			Breeze_MinificationCache::record_unwritable_file( $file_path );
-		}
-	}
-
-	public function get_cache_file_url( $type = 'css' ) {
-		$cache_dir = BREEZE_MINIFICATION_CACHE . breeze_effective_user_type() . ( ! empty( $type ) ? $type . '/' : '' );
-		if ( is_multisite() ) {
-			$blog_id   = get_current_blog_id();
-			$cache_dir = BREEZE_MINIFICATION_CACHE . $blog_id . '/' . breeze_effective_user_type() . ( ! empty( $type ) ? $type . '/' : '' );
-		}
-
-		return $cache_dir;
-	}
-
-	/**
-	 * @param string $url Script url.
-	 * @param array $defer_data Array with all defer scripts.
-	 *
-	 * @return bool
-	 */
-	protected function is_in_defer_is( $url, $defer_data ): bool {
-		if ( empty( $url ) || empty( $defer_data ) ) {
-			return false;
-		}
-
-		if (
-			in_array( $url, $defer_data, true ) ||
-			array_key_exists( $url, $defer_data )
-		) {
-			return true;
-		}
-
-		$return = false;
-
-		foreach ( $defer_data as $key => $value ) {
-			if (
-				false !== strpos( $key, $url ) ||
-				false !== strpos( $value, $url )
-			) {
-				$return = true;
-				break;
-			}
-		}
-
-		return $return;
-	}
-
-	public function create_cache_file_name( string $url = '', int $blog_id = 0, int $length = 0 ): string {
-		global $post;
-
-		$filename = '';
-		if ( is_object( $post ) ) {
-			$post_id = $post->ID;
-		}
-
-		if ( empty( $post_id ) ) {
-			$post_id = 0;
-		}
-
-		if ( ! empty( $url ) ) {
-			$current_url = $url;
-		} else {
-			//check disable cache for page
-			$http_host_breeze = ( isset( $_SERVER['HTTP_HOST'] ) ) ? $_SERVER['HTTP_HOST'] : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Reduced to a file name by sanitize_title() below.
-			$request_uri      = ( isset( $_SERVER['REQUEST_URI'] ) ) ? $_SERVER['REQUEST_URI'] : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Reduced to a file name by sanitize_title() below.
-			$domain           = ( ( ( ! empty( $_SERVER['HTTPS'] ) && 'off' !== $_SERVER['HTTPS'] ) || ( isset( $_SERVER['SERVER_PORT'] ) && 443 === (int) $_SERVER['SERVER_PORT'] ) ) ? 'https://' : 'http://' ) . $http_host_breeze;
-			$current_url      = $domain . rawurldecode( $request_uri );
-            $current_url = urldecode($current_url);
-
-		}
-		if ( empty( $blog_id ) ) {
-			$blog_id = get_current_blog_id();
-		}
-
-		$current_link = get_home_url( $blog_id );
-        $current_link = urldecode($current_link);
-		$current_link = untrailingslashit( $current_link );
-
-		$url_test_replace = str_replace( $current_link, '', $current_url );
-		$url_test_replace = sanitize_title( $url_test_replace );
-
-		if ( empty( $url_test_replace ) ) {
-			$url_test_replace = sanitize_title( $current_link );
-		}
-
-		if ( ! empty( $length ) ) {
-			$url_test_replace = substr( $url_test_replace, 0, $length );
-		}
-
-        $url_test_replace = str_replace('http-','', $url_test_replace);
-        $url_test_replace = str_replace('https-','', $url_test_replace);
-
-        //sanitize characters.
-        $url_test_replace = $this->breeze_sanitize_filename( $url_test_replace );
-
-		$filename = $url_test_replace . '-' . $blog_id . '-' . $post_id;
-
-		return $filename;
-	}
-
-    /**
-     * Sanitize filename to handle non-ASCII characters properly
-     *
-     * @param string $filename The filename to sanitize
-     * @return string Sanitized filename safe for filesystem
-     */
-    private function breeze_sanitize_filename( string $filename ): string {
-        // Remove leading/trailing slashes and whitespace
-        $filename = trim( $filename, '/ ' );
-
-        // If empty after trimming, return a default
-        if ( empty( $filename ) ) {
-            return 'home';
+                    // return 
+                    return "\n".$filecontent;'
+                ),
+                $in
+            );
+        } else {
+            $out = $in;
         }
-
-        if(function_exists('transliterator_transliterate')){
-            $filename = urldecode($filename);
-            $filename = transliterator_transliterate("Any-Latin; Latin-ASCII; Lower()",$filename);
-            $filename = preg_replace('/[^a-z0-9\-]+/', '-', $filename); // replace unsafe with hyphen
-            $filename = preg_replace('/-+/', '-', $filename); // collapse multiple hyphens
-            $filename = trim($filename, '-'); // trim leading/trailing hyphens
-        }else{
-            // Convert to lowercase for consistency
-            $filename = strtolower( $filename );
-            // Replace spaces and special characters with hyphens
-            $filename = preg_replace( '/[^a-z0-9\-_]/', '-', $filename );
-            // Remove multiple consecutive hyphens
-            $filename = preg_replace( '/-+/', '-', $filename );
-            // Remove leading/trailing hyphens
-            $filename = trim( $filename, '-' );
-        }
-
-
-        return $filename;
+        return $out;
     }
 }

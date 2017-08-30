@@ -1,18 +1,17 @@
-=== Breeze Cache ===
+=== Breeze - WordPress Cache Plugin ===
 Contributors: Cloudways
-Tags: cache,caching, performance, wp-cache, cdn
-Requires at least: 6.0
-Tested up to: 7.1
-Requires PHP: 7.4
-Stable tag: 2.6.5
+Tags: cache, caching, performance, wp-cache, cdn, combine, compress, speed plugin, database cache,gzip, http compression, js cache, minify, optimize, page cache, performance, speed, expire headers
+Requires at least: 4.5
+Tested up to: 4.8
+Stable tag: 1.0.3-beta
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-Breeze is a caching plugin developed by Cloudways. Breeze uses advance caching systems to improve site loading times exponentially.
+Breeze is a WordPress Caching Plugin developed by Cloudways. Breeze uses advance caching systems to improve WordPress loading times exponentially.
 
 == Description ==
 
-Breeze is a free, simple (yet powerful) and user-friendly caching plugin developed by the Cloudways team. It offers various options to optimize WordPress site performance at various levels. It works equally great with WordPress, WordPress with WooCommerce and WordPress Multisite.
+Breeze is a free, simple (yet powerful) and user-friendly WordPress Caching Plugin developed by the Cloudways team. It offers various options to optimize WordPress performance at various levels. It works equally great with WordPress, WordPress with WooCommerce and WordPress Multisite.
 
 Breeze excels in the following areas:
 
@@ -22,23 +21,13 @@ Breeze excels in the following areas:
 
 * **Simplicity:** Breeze is designed to be simple for all users. Just install and activate the plugin and you'll see the results instantaneously.
 
-What makes Breeze Cache Plugin awesome is that it comes with builtin support for Varnish. If Varnish is not installed on your servers, Breeze will utilize its internal cache mechanism to boost up your WordPress site performance.
+What makes Breeze WordPress Cache Plugin awesome is that it comes with builtin support for Varnish. If Varnish is not installed on your servers, Breeze will utilize its internal cache mechanism to boost up your WordPress site performance.
 
-**FEATURES**
+**Support:** We love to provide support! Post your questions on the WordPress.org support forums, or if you are a Cloudways Customer you may ask questions on the <a href="https://community.cloudways.com/">Cloudways Community Forum</a>. 
 
-* Seamless integration with Varnish Cache for efficient content delivery. No manual adjustments needed – all settings come pre-configured for your convenience.
-* Optimize performance using Cloudflare's caching capabilities. No specific Breeze configurations are needed – it works out of the box.
-* Effortlessly integrate your preferred Content Delivery Network (CDN) for global content distribution with Breeze instead of using the the CDN providers' plugins.
-* Trim WordPress database bloat effortlessly. Breeze's Database Options optimize and declutter your database, boosting performance by removing unneeded data like post revisions and trashed content.
-* Take command over caching exclusions. With Breeze, you have the power to prevent specific URLs, JS files, and CSS files from being cached.
-* Achieve smaller page sizes and faster load times through HTML, CSS, and JavaScript minification, including inline CSS and JavaScript minification.
-* Load images when they're visible, not all at once, for faster webpage performance by implementing lazy loading for images.
-* Load JS files with deferred loading, enhancing overall performance.
-* Supercharge your site's speed with Breeze's advanced preloading features: load fonts early, quicken link clicks, and enhance DNS requests for a seamless user experience.
-* Master real-time interactions with Breeze's Heartbeat API management. Fine-tune notifications, sales data, autosaves, and more to optimize WordPress website performance by adjusting API call frequencies.
-* Effortlessly manage Breeze settings using Import/Export. Download your configurations as a .json file for backup, or effortlessly import existing settings to quickly fine-tune your optimization.
+**Note:** This plugin is still in Beta phase and this plugin is tested on Cloudways WordPress hosting servers.
 
-**Support:** We love to provide support! Post your questions on the WordPress.org support forums, or if you are a Cloudways Customer you may ask questions on the <a href="https://community.cloudways.com/">Cloudways Community Forum</a>.
+**Special Thanks:** We would like to give special mention to WP Speed Of Light for being an inspiration for Breeze.
 
 == Installation ==
 
@@ -48,9 +37,9 @@ What makes Breeze Cache Plugin awesome is that it comes with builtin support for
 * Click install and wait for the installation to finish. Next, click the activate link
 
 = To install the plugin manually: =
-* Download and unzip the plugin package - breeze.zip
+* Download and unzip the plugin package - breeze.1.0.0.zip
 * Upload the breeze to /wp-content/plugins/
-* Activate the plugin through the 'Plugins' menu in WordPress Dashboard
+* Activate the plugin through the 'Plugins' menu in WordPress
 * Access Breeze from WordPress Admin > Settings > Breeze
 
 == Frequently Asked Questions ==
@@ -65,7 +54,7 @@ To install the plugin via WordPress Dashboard
 To install the plugin manually
 1. Download and unzip the plugin package - breeze.1.0.0.zip
 2. Upload the /breeze to /wp-content/plugins/
-3. Activate the plugin through the 'Plugins' menu in WordPress Dashboard
+3. Activate the plugin through the 'Plugins' menu in WordPress
 4. Access Breeze from WordPress Admin > Settings > Breeze
 
 = Does Breeze support Varnish and to what extent? =
@@ -74,19 +63,15 @@ Breeze, by default, supports Varnish. It has been tested to be fully compatible 
 
 = Does Breeze support WooCommerce? =
 
-Breeze is fully compatible with WooCommerce, out of the box. It does not require any special configurations.
+Breeze is fully compatible with WooCommerce, out of the box. It does not require any special configurations. 
 
 = Does Breeze support WordPress Multisite? =
 
-Breeze is fully compatible with WordPress Multisite without the need for any extra configuration.
+Breeze is fully compatible with WordPress Multisite without the need for any extra configuration. 
 
-= How does Breeze handle WordPress Mltisite? =
+= Is Breeze compatible with other WordPress Cache plugins? =
 
-Breeze handles all WordPress Multisite instances globally. All the settings for multisite are now handled on the network level.
-
-= Is Breeze compatible with other WordPress cache plugins? =
-
-We DO NOT recommend using two WordPress cache plugins at the same time on any WordPress website.
+We DO NOT recommend using two WordPress cache plugins at the same time on any WordPress website. 
 We strongly recommend that you use Breeze as the only cache plugin for your website. If there are any other cache plugins installed, please ensure that you have disabled them prior to proceeding with the Breeze installation.
 
 
@@ -100,13 +85,13 @@ Breeze has been tested with popular plugins available on WordPress.org. Please f
 
 = Does Breeze support CDN? =
 
-Breeze supports CDN integration. It allows all static assets (such as images, CSS and JS files) to be served via CDN.
+Breeze supports CDN integration. It allows all static assets (such as images, CSS and JS files) to be served via CDN. 
 
 = What does Breeze's Database Optimization feature do? =
 
-WordPress databases are notorious for storing information like post revisions, spam comments and much more. Over time, databases l become bloated and it is a good practice to clear out unwanted information to reduce database size and improve optimization.
+WordPress databases are notorious for storing information like post revisions, spam comments and much more. Over time, databases l become bloated and it is a good practice to clear out unwanted information to reduce database size and improve optimization. 
 
-Breeze's database optimization cleans out unwanted information in a single click.
+Breeze's database optimization cleans out unwanted information in a single click. 
 
 = Will comments and other dynamic parts of my blog appear immediately? =
 
@@ -114,103 +99,38 @@ Comments will appear upon moderation as per the comment system (or policy) set i
 
 = Can I exclude URLs of individual files and pages from cache? =
 
-You can exclude a file by mentioning its URL or file type (by mentioning file extension) in the exclude fields (available in the Breeze settings). Exclude will not let the cache impact that URL or file type.
+You can exclude a file by mentioning its URL or file type (by mentioning file extension) in the exclude fields (available in the Breeze settings). Exclude will not let the cache impact that URL or file type. 
 
 If Varnish is active, you will need to exclude URLs and file type(s) in the Varnish configuration. If you are hosting WordPress websites on Cloudways servers, follow <a href="https://support.cloudways.com/how-to-exclude-url-from-varnish/">this KB to exclude URLs from the Varnish cache</a>.
 
+
 = Does it work with all hosting providers? =
 
-Breeze has been tested to work with all major hosting providers. In addition, major Breeze options such as Gzip, browser cache, minification, grouping, database optimization. CDN integration will work as expected on all hosting providers.
+Breeze is in Beta phase and has not yet been tested on hosting providers other than Cloudways. 
+However, major Breeze options such as Gzip, browser cache, minification, grouping, database optimization. CDN integration will work as expected on other hosting providers. 
+
 
 = Where can I get support for Breeze? =
 
 You can get your questions answered on the WordPress support forums. If you are a Cloudways customer, please feel free to start a discussion at <a href="https://community.cloudways.com/">Cloudways Community Forum</a>.
 
-= How can I test and verify the results? =
-
-You will be able to see the impact of the Breeze Cache Plugin almost immediately. We also recommend using the following tools for generating metrics:
-<a href="https://developers.google.com/speed/pagespeed/" target="_blank">Google Page Speed</a>
-<a href="https://www.webpagetest.org/test" target="_blank">WebPagetest</a>
-<a href="https://tools.pingdom.com/" target="_blank">Pingdom</a>
-
-= Does Breeze plugin work with Visual Builder? =
-
-Yes, Breeze Plugin is compatible with Visual Builder.
-
-= What popular CDN are supported by Breeze Plugin? =
-
-Breeze supports the following three popular CDNs:
-<a href="https://support.cloudways.com/how-to-use-breeze-with-maxcdn/" target="_blank">MaxCDN</a>
-<a href="https://support.cloudways.com/how-to-use-breeze-with-keycdn/" target="_blank">KeyCDN</a>
-<a href="https://support.cloudways.com/how-to-use-breeze-with-amazon-cloudfront/" target="_blank">Amazon Cloudfront</a>
-
-= Does Breeze support Push CDN? =
-
-No, Breeze does not support Push CDN. However, you could use Breeze with Push CDNs using third party plugins.
-
-= Does Breeze Work With CloudFlare? =
-
-Yes. The process of setting up CloudFlare with Breeze is easy. Check out the following <a href="https://support.cloudways.com/can-i-use-cloudflare-cdn/" target="_blank">KnowledgeBase article</a> for details. 
-
-= How Breeze cache uses Gzip? =
-
-Using Gzip, Breeze compresses the request files, further reducing the size of the download files and speeding up the user experience.
-
 == Changelog ==
 
-= 2.6.5 =
+= 1.0.3-beta =
+* Fix : Disabled browser cache for WooCommerce cart, shop and account pages
+* Fix : Removal of htaccess when disabling browser cache and gzip compression options
+* Fix : CDN issues of not serving all the configured contents from CDN service
 
-* Improvement: Fixed more Plugin Check warnings to meet WordPress.org plugin standards.
-* Fix: Tracking parameters such as utm_source, gclid, and fbclid are now kept when WordPress redirects a page, for example when it adds a trailing slash.
-* Fix: Cache Warmup now finishes warming your URLs after a cache purge, even when no one has wp-admin open.
-* Fix: CSS and JS from shortcut themes and plugins are minified again.
-* Fix: Option names on the Database tab are now shown as plain text.
-* Fix: The loading overlay color is now used only when it is a normal hex color.
+= 1.0.2-beta =
+* Fix : Compatibility issues of WooCommerce
 
-= 2.6.4 =
+= 1.0.1-beta =
+* Fix : Purging issue to allow only admin users to Purge
+* Add : Feedback link
 
-* New: The Breeze settings page now shows a short review request that you can postpone or dismiss.
-* Improvement: Visitors arriving from Google Ads links (with tracking parameters such as gclid) now get the cached page.
-* Improvement: Fixed Plugin Check warnings to meet WordPress.org plugin standards.
-* Fix: DNS Prefetch no longer marks addresses that start with "//", such as //fonts.googleapis.com, as invalid.
-* Fix: Automatic plugin updates no longer stop after the first plugin when several plugins update at once on sites using Redis or Object Cache Pro.
+= 1.0.0 =
+* Add : First Beta release
 
-= 2.6.3 =
-
-* Fix: Extra link parameters can no longer be used to store the wrong page in the cache.
-* Fix: Switching tabs in Breeze settings no longer shows the text “no-issue”.
-* Fix: Logging out now clears Breeze’s login cookie on sites installed in a subfolder.
-* Fix: Unpublishing a post now removes the cached page visitors were seeing.
-* Fix: Saving a post with a non-English address, such as Hebrew, now clears that page’s cache.
-
-= 2.6.2 =
-
-* Improvement: Activating or deactivating a plugin in Network Admin is now faster when Preload URLs is off.
-* Improvement: On Multisite, each site now saves the new Breeze version after an update, so the update routine doesn’t run again.
-* Improvement: Uninstalling Breeze now removes leftover update data.
-* Fix: Pages excluded by Never Cache are no longer cached, and links with extra parameters (such as tracking codes) still open the correct page.
-* Fix: Locally hosted Google Fonts now load correctly.
-* Fix: Refresh cached page parts now updates the correct section when a page contains several similar elements.
-* Fix: Updating a post through WP-CLI or a scheduled task now clears that post’s cache.
-* Fix: Turning Varnish off in Breeze now keeps it off.
-* Fix: Removed an “Array to string conversion” warning in the PHP error log after a visitor leaves a comment.
-
-= 2.6.1 =
-
-* Fix: Resolved high server load and slow or timed-out pages right after updating Breeze (mostly Multisite).
-
-= 2.6.0 =
-
-* New: Cache Full Page HTML is now a separate option.
-* New: Added Refresh cached page parts (beta). After a cached page loads, selected parts can be refreshed so they stay up to date. Off by default.
-* Fix: Resolved a PHP fatal error on sites using the FooEvents plugin.
-* Fix: Fixed minified CSS/JS being stored in the wrong folder for logged-in users.
-* Fix: Removed duplicate cache-purge requests when updating a post.
-* Fixed: "Never Cache URL(s)" no longer shows an invalid URL warning for domains with long TLD endings.
-* Improvement: Breeze now updates its config file in place instead of deleting and recreating it.
-* Improvement: Breeze no longer removes locally hosted Google/Facebook files during updates.
-
-[See changelog for all versions](https://plugins.svn.wordpress.org/breeze/trunk/changelog.txt)
 
 == Upgrade Notice ==
 
@@ -221,7 +141,4 @@ Update Breeze through WordPress Admin > Dashboard >Updates. The settings will re
 
 == Requirements ==
 
-
-PHP 7.4, PHP 8 recommended for better performance, WordPress 6.0+
-
-
+PHP 5.3+, PHP7 or 7.1 recommended for better performance, WordPress 4.5+
