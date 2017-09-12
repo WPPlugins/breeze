@@ -3,7 +3,7 @@ Contributors: Cloudways
 Tags: cache, caching, performance, wp-cache, cdn, combine, compress, speed plugin, database cache,gzip, http compression, js cache, minify, optimize, page cache, performance, speed, expire headers
 Requires at least: 4.5
 Tested up to: 4.8
-Stable tag: 1.0.3-beta
+Stable tag: 1.0.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,8 +24,6 @@ Breeze excels in the following areas:
 What makes Breeze WordPress Cache Plugin awesome is that it comes with builtin support for Varnish. If Varnish is not installed on your servers, Breeze will utilize its internal cache mechanism to boost up your WordPress site performance.
 
 **Support:** We love to provide support! Post your questions on the WordPress.org support forums, or if you are a Cloudways Customer you may ask questions on the <a href="https://community.cloudways.com/">Cloudways Community Forum</a>. 
-
-**Note:** This plugin is still in Beta phase and this plugin is tested on Cloudways WordPress hosting servers.
 
 **Special Thanks:** We would like to give special mention to WP Speed Of Light for being an inspiration for Breeze.
 
@@ -106,15 +104,19 @@ If Varnish is active, you will need to exclude URLs and file type(s) in the Varn
 
 = Does it work with all hosting providers? =
 
-Breeze is in Beta phase and has not yet been tested on hosting providers other than Cloudways. 
-However, major Breeze options such as Gzip, browser cache, minification, grouping, database optimization. CDN integration will work as expected on other hosting providers. 
-
+Breeze has been tested to work with all major hosting providers. In addition, major Breeze options such as Gzip, browser cache, minification, grouping, database optimization. CDN integration will work as expected on all hosting providers.
 
 = Where can I get support for Breeze? =
 
 You can get your questions answered on the WordPress support forums. If you are a Cloudways customer, please feel free to start a discussion at <a href="https://community.cloudways.com/">Cloudways Community Forum</a>.
 
 == Changelog ==
+
+= 1.0.4 =
+* Fix: Browser Cache issues with WooCommerce session
+* Fix: Clearing Breeze rules from .htaccess upon deactivating of GZIP/Broswer Cache
+* Fix: Regex fix for accepting source url's without quotes while enabling minifcation
+* Add: FAQ section added
 
 = 1.0.3-beta =
 * Fix : Disabled browser cache for WooCommerce cart, shop and account pages
