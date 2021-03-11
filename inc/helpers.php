@@ -619,3 +619,16 @@ function breeze_unlock_process( $path = '' ) {
 
 	return false;
 }
+
+function multisite_blog_id_config() {
+	global $blog_id;
+
+	$blog_id_requested = isset( $GLOBALS['breeze_config']['blog_id'] ) ? $GLOBALS['breeze_config']['blog_id'] : 0;
+	if ( ! empty( $blog_id_requested ) ) {
+		return $blog_id_requested;
+	}
+
+	if ( ! empty( $blog_id ) ) {
+
+	}
+}

@@ -85,6 +85,21 @@ class Breeze_Ecommerce_Cache {
 		return $urls;
 	}
 
+	/**
+	 * Removes from cache WooCommerce Facebook Product Feed.
+	 *
+	 * @return array
+	 * @since 1.1.8
+	 * @access public
+	 */
+	public function wc_facebook_feed() {
+		$urls = array();
+		if ( class_exists( 'WC_Facebook_Loader' ) ) {
+			$urls[] = SkyVerge\WooCommerce\Facebook\Products\Feed::get_feed_data_url();
+		}
+
+		return $urls;
+	}
 	/*
 	 * Return basic url without translate plugin
 	 */

@@ -163,6 +163,34 @@ class Breeze_ConfigCache {
 			! empty( $config['breeze-exclude-urls'] ) ? $config['breeze-exclude-urls'] : array()
 		);
 
+	    $saved_pages = get_option( 'breeze_exclude_url_pages', array() );
+
+	    if ( ! empty( $saved_pages ) ) {
+		    $saved_pages_urls = array();
+		    foreach ( $saved_pages as $page_id ) {
+			    $saved_pages_urls[] = get_permalink( $page_id );
+		    }
+
+		    $saved_pages_urls = array_unique( $saved_pages_urls );
+
+		    $storage['exclude_url'] = array_merge(
+			    $saved_pages_urls,
+			    ! empty( $config['breeze-exclude-urls'] ) ? $config['breeze-exclude-urls'] : array()
+		    );
+	    }
+
+
+	    if( class_exists('WC_Facebook_Loader')){
+		    $woocommerce_fb_feed_link = Breeze_Ecommerce_Cache::factory()->wc_facebook_feed();
+
+		    if(!empty($woocommerce_fb_feed_link)){
+			    $storage['exclude_url'] = array_merge(
+				    $woocommerce_fb_feed_link,
+				    ! empty( $config['breeze-exclude-urls'] ) ? $config['breeze-exclude-urls'] : array()
+			    );
+		    }
+	    }
+
 		return self::write_config( $storage );
     }
 
@@ -192,7 +220,8 @@ class Breeze_ConfigCache {
 
 		$config_file_string = '<?php ' . "\n\r" . "defined( 'ABSPATH' ) || exit;" . "\n\r" . 'return ' . var_export( $config, true ) . '; ' . "\n\r";
 
-		return $wp_filesystem->put_contents( $config_file, $config_file_string );
+
+	    return $wp_filesystem->put_contents( $config_file, $config_file_string );
     }
     //turn on / off wp cache
     public function toggle_caching( $status ) {

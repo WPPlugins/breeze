@@ -16,6 +16,10 @@ if ( strpos( $_SERVER['REQUEST_URI'], 'robots.txt' ) !== false || strpos( $_SERV
 	return;
 }
 
+if ( strpos( $_SERVER['REQUEST_URI'], 'breeze-minification' ) !== false ) {
+	return;
+}
+
 // Don't cache non-GET requests
 if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || $_SERVER['REQUEST_METHOD'] !== 'GET' ) {
 	return;
@@ -63,10 +67,16 @@ if ( ! empty( $_COOKIE ) ) {
 		foreach ( $_COOKIE as $k => $v ) {
 			if ( strpos( $k, 'wordpress_logged_in_' ) !== false ) {
 				$nameuser = substr( $v, 0, strpos( $v, '|' ) );
-				$filename = $url_path . strtolower( $nameuser );
+				if ( substr_count( $url_path, '?' ) > 0 ) {
+					$filename = $url_path .'&'. strtolower( $nameuser );
+				}else{
+					$filename = $url_path .'?'. strtolower( $nameuser );
+				}
+
 			}
 		}
 	}
+
 	if ( ! empty( $_COOKIE['breeze_commented_posts'] ) ) {
 		foreach ( $_COOKIE['breeze_commented_posts'] as $path ) {
 			if ( rtrim( $path, '/' ) === rtrim( $_SERVER['REQUEST_URI'], '/' ) ) {
@@ -83,7 +93,6 @@ $domain = ( ( ( ! empty( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] !== 'off' ) ||
 $current_url   = $domain . rawurldecode( $_SERVER['REQUEST_URI'] );
 $opts_config   = $GLOBALS['breeze_config'];
 $check_exclude = check_exclude_page( $opts_config, $current_url );
-
 //load cache
 if ( ! $check_exclude ) {
 	$devices = $opts_config['cache_options'];
@@ -118,11 +127,11 @@ if ( ! $check_exclude ) {
 /**
  * Cache output before it goes to the browser
  *
- * @param  string $buffer
- * @param  int $flags
+ * @param string $buffer
+ * @param int $flags
  *
- * @since  1.0
  * @return string
+ * @since  1.0
  */
 function breeze_cache( $buffer, $flags ) {
 	// No cache for pages without 200 response status
@@ -211,7 +220,13 @@ function breeze_cache( $buffer, $flags ) {
 	if ( is_user_logged_in() ) {
 		$current_user = wp_get_current_user();
 		if ( $current_user->user_login ) {
-			$url_path .= $current_user->user_login;
+
+			if ( substr_count( $url_path, '?' ) > 0 ) {
+				$url_path .= '&'. $current_user->user_login;
+			}else{
+				$url_path .= '?'. $current_user->user_login;
+			}
+			#$url_path .= $current_user->user_login;
 		}
 	} else {
 		global $filename_guest_suffix;
@@ -273,8 +288,8 @@ function breeze_cache( $buffer, $flags ) {
 /**
  * Get URL path for caching
  *
- * @since  1.0
  * @return string
+ * @since  1.0
  */
 function breeze_get_url_path() {
 
@@ -352,6 +367,13 @@ function breeze_serve_cache( $filename, $url_path, $X1, $opts ) {
 }
 
 function check_exclude_page( $opts_config, $current_url ) {
+	$is_feed = breeze_is_feed( $current_url );
+
+	if ( true === $is_feed ) {
+		return true;
+	}
+
+
 	//check disable cache for page
 	if ( ! empty( $opts_config['exclude_url'] ) ) {
 		foreach ( $opts_config['exclude_url'] as $v ) {
