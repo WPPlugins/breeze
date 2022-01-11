@@ -40,7 +40,6 @@ class Breeze_Minify {
 			$current_url = $domain . rawurldecode( $_SERVER['REQUEST_URI'] );
 
 			$check_url = $this->check_exclude_url( $current_url );
-
 			//load config file when redirect template
 			if ( ! $check_url && self::should_cache() ) {
 				//cache html
@@ -392,8 +391,11 @@ class Breeze_Minify {
 
 				} else {
 
-					$test_url    = ltrim( $exclude_url_item, 'https:' );
+					$test_url = ltrim( $exclude_url_item, 'https:' );
+					$test_url = $this->rtrim_urls($test_url);
+
 					$current_url = ltrim( $current_url, 'https:' );
+					$current_url = $this->rtrim_urls($current_url);
 
 					// Whole path
 					if ( mb_strtolower( $test_url ) === mb_strtolower( $current_url ) ) {
