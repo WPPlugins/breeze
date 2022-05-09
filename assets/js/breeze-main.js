@@ -278,14 +278,38 @@ jQuery( document ).ready(
 
 		$box_container.on(
 			'change',
+			'#breeze-delay-all-js',
+			function () {
+				var $delay_js_div_all = $( '#breeze-delay-js-scripts-div-all' );
+				var $enable_inline_delay = $( '#enable-js-delay' );
+
+				if ( $( this ).is( ':checked' ) ) {
+					$delay_js_div_all.show();
+					$( 'input[name="enable-js-delay"]' ).prop( 'checked', false );
+					$( '#breeze-delay-js-scripts-div' ).hide();
+					$enable_inline_delay.attr( 'disabled', 'disabled' );
+				} else { 
+					$delay_js_div_all.hide();
+					$enable_inline_delay.removeAttr( 'disabled' );
+				}
+			}
+		)
+
+		$box_container.on(
+			'change',
 			'#enable-js-delay',
 			function () {
-				$delay_js_div = $( '#breeze-delay-js-scripts-div' );
+				var $delay_js_div = $( '#breeze-delay-js-scripts-div' );
+				var $delay_all_js = $('#breeze-delay-all-js');
 
 				if ( $( this ).is( ':checked' ) ) {
 					$delay_js_div.show();
+					$( 'input[name="breeze-delay-all-js"]' ).prop( 'checked', false );
+					$( '#breeze-delay-js-scripts-div-all' ).hide();
+					$delay_all_js.attr( 'disabled', 'disabled' );
 				} else {
 					$delay_js_div.hide();
+					$delay_all_js.removeAttr( 'disabled' );
 				}
 			}
 		)
@@ -338,12 +362,15 @@ jQuery( document ).ready(
 		initRemoveBtn();
 
 		function initSortableHandle() {
-			$( '.breeze-list-url' ).sortable(
-				{
-					handle: $( 'span.sort-handle' ),
-					stop: validateMoveButtons
-				}
-			);
+
+			if ( $( '.breeze-list-url' ).length ) {
+				$( '.breeze-list-url' ).sortable(
+					{
+						handle: $( 'span.sort-handle' ),
+						stop: validateMoveButtons
+					}
+				);
+			}
 		}
 
 		initSortableHandle();
@@ -468,14 +495,16 @@ jQuery( document ).ready(
 				// Toggle right-side content
 				if ( id_tab === 'faq' ) {
 					$( '#breeze-and-cloudways' ).hide();
-					$( '#faq-content' ).accordion(
-						{
-							collapsible: true,
-							animate: 200,
-							header: '.faq-question',
-							heightStyle: 'content'
-						}
-					);
+					if ( $( '#faq-content' ).length ) {
+						$( '#faq-content' ).accordion(
+							{
+								collapsible: true,
+								animate: 200,
+								header: '.faq-question',
+								heightStyle: 'content'
+							}
+						);
+					}
 				} else {
 					$( '#breeze-and-cloudways' ).show();
 				}
@@ -508,14 +537,16 @@ jQuery( document ).ready(
 			// Toggle right-side content
 			if ( active_tab === 'faq' ) {
 				$( '#breeze-and-cloudways' ).hide();
-				$( '#faq-content' ).accordion(
-					{
-						collapsible: true,
-						animate: 200,
-						header: '.faq-question',
-						heightStyle: 'content'
-					}
-				);
+				if ( $( '#faq-content' ).length ) {
+					$( '#faq-content' ).accordion(
+						{
+							collapsible: true,
+							animate: 200,
+							header: '.faq-question',
+							heightStyle: 'content'
+						}
+					);
+				}
 			} else {
 				$( '#breeze-and-cloudways' ).show();
 			}
@@ -830,14 +861,17 @@ jQuery( document ).ready(
 						breeze_permission_check();
 						document.cookie = 'breeze_active_tab=' + requested_tab;
 						if ( 'faq' === requested_tab ) {
-							$( '#faq-content' ).accordion(
-								{
-									collapsible: true,
-									animate: 200,
-									header: '.faq-question',
-									heightStyle: 'content'
-								}
-							);
+							if ( $( '#faq-content' ).length ) {
+								$( '#faq-content' ).accordion(
+									{
+										collapsible: true,
+										animate: 200,
+										header: '.faq-question',
+										heightStyle: 'content'
+									}
+								);
+							}
+
 						}
 						selected_services = [];
 					}

@@ -220,7 +220,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/basic-active.png';
 				$iframe_lazy_load = ( isset( $basic_value ) && true === $basic_value ) ? checked( $basic['breeze-lazy-load-iframes'], '1', false ) : '';
 				?>
 
-                <span <?php echo $hide; ?> id="native-lazy-option-iframe">
+				<span <?php echo $hide; ?> id="native-lazy-option-iframe">
 						<div class="on-off-checkbox">
 						<input id="bz-lazy-load-iframe" type="checkbox" name="bz-lazy-load-iframe" class="br-box" value='1' <?php echo $iframe_lazy_load; ?>>
 						<label for="bz-lazy-load-iframe">
@@ -238,9 +238,9 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/basic-active.png';
 						_e( 'Apply lazy load to iframe/videos tags.', 'breeze' );
 						?>
 					</p>
-                </span>
+				</span>
 
-                <span <?php echo $hide; ?> id="native-lazy-option">
+				<span <?php echo $hide; ?> id="native-lazy-option">
 						<div class="on-off-checkbox">
 						<input id="bz-lazy-load-nat" type="checkbox" name="bz-lazy-load-nat" class="br-box" value='1' <?php echo $native_lazy_load; ?>>
 						<label for="bz-lazy-load-nat">
@@ -258,12 +258,12 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/basic-active.png';
 						_e( 'This is not supported by all browsers.', 'breeze' );
 						?>
 					</p>
-                </span>
+				</span>
 
 
-            </div>
-        </div>
-        <!-- END OPTION -->
+			</div>
+		</div>
+		<!-- END OPTION -->
 
 		<!-- START OPTION -->
 		<div class="br-option-item">

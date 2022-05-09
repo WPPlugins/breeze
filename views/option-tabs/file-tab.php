@@ -552,11 +552,24 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 				</div>
 				<div class="br-option">
 					<?php
-					$basic_value = isset( $options['breeze-enable-js-delay'] ) ? filter_var( $options['breeze-enable-js-delay'], FILTER_VALIDATE_BOOLEAN ) : false;
-					$is_enabled  = ( isset( $basic_value ) && true === $basic_value ) ? checked( $options['breeze-enable-js-delay'], '1', false ) : '';
+                    // Delay All JavaScript START
+					/**
+					 * Used to disable one of the options when the ther is active.
+					 */
+					$basic_value_all = isset( $options['breeze-delay-all-js'] ) ? filter_var( $options['breeze-delay-all-js'], FILTER_VALIDATE_BOOLEAN ) : false;
+					$is_enabled_all  = ( isset( $basic_value_all ) && true === $basic_value_all ) ? checked( $options['breeze-delay-all-js'], '1', false ) : '';
+                    // END
+
+					$basic_value_inlinejs = isset( $options['breeze-enable-js-delay'] ) ? filter_var( $options['breeze-enable-js-delay'], FILTER_VALIDATE_BOOLEAN ) : false;
+					$is_enabled_inlinejs  = ( isset( $basic_value_inlinejs ) && true === $basic_value_inlinejs ) ? checked( $options['breeze-enable-js-delay'], '1', false ) : '';
+
+                    $delay_inline_disabled = '';
+                    if(true ===  $basic_value_all){
+	                    $delay_inline_disabled = 'disabled="disabled"';
+                    }
 					?>
 					<div class="on-off-checkbox">
-						<input id="enable-js-delay" name="enable-js-delay" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?>>
+						<input <?php echo $delay_inline_disabled; ?> id="enable-js-delay" name="enable-js-delay" type="checkbox" class="br-box" value="1" <?php echo $is_enabled_inlinejs; ?>>
 						<label for="enable-js-delay">
 							<div class="status-switch" data-unchecked="OFF" data-checked="ON"></div>
 						</label>
@@ -569,7 +582,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 					}
 
 					$display_text_area = 'style="display:none"';
-					if ( true === $basic_value ) {
+					if ( true === $basic_value_inlinejs ) {
 						$display_text_area = 'style="display:block"';
 					}
 					?>
@@ -586,10 +599,106 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 							</p>
 							<p class="br-notice">
 								<?php _e( 'Please clear Varnish after applying the new settings.', 'breeze' ); ?>
+
 							</p>
 						</div>
 					</div>
+                    <p class="br-important">
+						<?php
+						echo '<strong>';
+						_e( 'Important: ', 'breeze' );
+						echo '</strong>';
+						_e( 'Use only one option "Delay JS Inline Scripts" OR "Delay All JavaScript" at same time.', 'breeze' );
+						?>
+                    </p>
+				</div>
+			</div>
+			<!-- END OPTION -->
 
+			<!-- START OPTION -->
+			<div class="br-option-item">
+				<div class="br-label">
+					<div class="br-option-text">
+						<?php _e( 'Delay All JavaScript', 'breeze' ); ?>
+					</div>
+				</div>
+				<div class="br-option">
+					<?php
+					$basic_value_all = isset( $options['breeze-delay-all-js'] ) ? filter_var( $options['breeze-delay-all-js'], FILTER_VALIDATE_BOOLEAN ) : false;
+					$is_enabled_all  = ( isset( $basic_value_all ) && true === $basic_value_all ) ? checked( $options['breeze-delay-all-js'], '1', false ) : '';
+
+					$js_minify_state = true;
+					if ( empty( $is_enabled_all ) ) {
+						$js_minify_state = false;
+					}
+
+					$delay_js_disabled = '';
+					if(true ===  $basic_value_inlinejs){
+						$delay_js_disabled = 'disabled="disabled"';
+					}
+					?>
+					<div class="on-off-checkbox">
+						<input <?php echo $delay_js_disabled; ?> id="breeze-delay-all-js" name="breeze-delay-all-js" type="checkbox" class="br-box" value="1" <?php echo $is_enabled_all; ?>>
+						<label for="breeze-delay-all-js">
+							<div class="status-switch" data-unchecked="OFF" data-checked="ON"></div>
+						</label>
+					</div>
+					<div class="br-note">
+						<p>
+							<?php _e( 'Improve the page load by delaying JavaScript execution.', 'breeze' ); ?>
+						</p>
+
+						<p class="br-important">
+							<?php
+							//                          echo '<strong>';
+							//                          _e( 'Important: ', 'breeze' );
+							//                          echo '</strong>';
+							//                          _e( 'We recommend testing minification on a staging website before deploying it on a live website. ', 'breeze' );
+							//                          echo '<br/>';
+							//                          _e( 'Minification is known to cause issues on the frontend.', 'breeze' );
+							?>
+						</p>
+					</div>
+
+					<?php
+					$js_output = '';
+					if ( ! empty( $options['no-breeze-no-delay-js'] ) ) {
+						$output    = implode( "\n", $options['no-breeze-no-delay-js'] );
+						$js_output = esc_textarea( $output );
+					}
+
+					$display_text_area = 'style="display:none"';
+					if ( true === $basic_value_all ) {
+						$display_text_area = 'style="display:block"';
+					}
+
+					?>
+
+					<div <?php echo $display_text_area; ?> id="breeze-delay-js-scripts-div-all">
+						<br/>
+						<div class="br-option-text"><strong><?php _e( 'List of scripts not to delay', 'breeze' ); ?></strong></div>
+						<textarea cols="100" rows="7" id="no-delay-js-scripts" name="no-delay-js-scripts"><?php echo $js_output; ?></textarea>
+						<div class="br-note">
+							<p>
+								<?php
+
+								_e( 'You can add specific keywords to identify the Inline JavaScript or JavaScript files to not be delayed. Each script identifying keyword must be added on a new line.', 'breeze' );
+								?>
+							</p>
+							<p class="br-notice">
+								<?php _e( 'Please clear Varnish after applying the new settings.', 'breeze' ); ?>
+
+							</p>
+						</div>
+					</div>
+                    <p class="br-important">
+						<?php
+						echo '<strong>';
+						_e( 'Important: ', 'breeze' );
+						echo '</strong>';
+						_e( 'Use only one option "Delay JS Inline Scripts" OR "Delay All JavaScript" at same time.', 'breeze' );
+						?>
+                    </p>
 				</div>
 			</div>
 			<!-- END OPTION -->

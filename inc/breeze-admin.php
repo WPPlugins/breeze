@@ -87,7 +87,6 @@ class Breeze_Admin {
 		$is_lazy_load_native  = false;
 		$is_lazy_load_iframe  = false;
 
-
 		$option_breeze_lazy_load         = Breeze_Options_Reader::get_option_value( 'breeze-lazy-load' );
 		$option_breeze_lazy_load_native  = Breeze_Options_Reader::get_option_value( 'breeze-lazy-load-native' );
 		$option_breeze_lazy_load_iframes = Breeze_Options_Reader::get_option_value( 'breeze-lazy-load-iframes' );
@@ -401,6 +400,8 @@ class Breeze_Admin {
 			'breeze-move-to-footer-js' => array(),
 			'breeze-defer-js'          => array(),
 			'breeze-enable-js-delay'   => '0',
+			'no-breeze-no-delay-js'    => array(),
+			'breeze-delay-all-js'      => '0',
 		);
 
 		$file = array_merge( $default_file, $file );
