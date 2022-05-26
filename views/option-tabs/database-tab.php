@@ -117,7 +117,14 @@ $sections_actions = array(
 	</div>
 	<br/>
 	<div class="cta-cleanall">
-	<input type="checkbox" name="br-clean-all" id="br-clean-all"/>
+
+		<div class="on-off-checkbox brilbr">
+			<label class="br-switcher">
+				<input type="checkbox" name="br-clean-all" id="br-clean-all"/>
+				<div class="br-see-state">
+				</div>
+			</label><br>
+		</div>
 	<label for="br-clean-all" class="br-clean-label"><?php _e( 'Clean All', 'breeze' ); ?> <span class="br-has">( <?php echo esc_html( $total_no ); ?> )</span></label>
 	<p>
 		<?php _e( 'Cleall the trashed posts and pages.', 'breeze' ); ?>

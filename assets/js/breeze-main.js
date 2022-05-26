@@ -242,17 +242,27 @@ jQuery( document ).ready(
 
 				var include_inline_css = $( '#include-inline-css' );
 				var group_css          = $( '#group-css' );
+				var minification_css   = $( '#exclude-css' );
 
 				if ( $( this ).is( ':checked' ) ) {
 					font_display_swap.show();
-					include_inline_css.removeAttr( 'disabled' );
-					group_css.removeAttr( 'disabled' );
+					//include_inline_css.removeAttr( 'disabled' );
+					//group_css.removeAttr( 'disabled' );
+
+					minification_css.closest('div.br-option-item').removeClass('br-apply-disable');
+					group_css.closest('div.br-option-item').removeClass('br-apply-disable');
+					include_inline_css.closest('div.br-option-item').removeClass('br-apply-disable');
 				} else {
 					font_display_swap.hide();
 					font_display.removeAttr( 'checked' );
-					include_inline_css.removeAttr( 'checked' ).attr( 'disabled', 'disabled' );
-					group_css.removeAttr( 'checked' ).attr( 'disabled', 'disabled' );
+					//include_inline_css.removeAttr( 'checked' ).attr( 'disabled', 'disabled' );
+					//group_css.removeAttr( 'checked' ).attr( 'disabled', 'disabled' );
+					include_inline_css.prop( 'checked', false );
+					group_css.prop( 'checked', false );
 
+					minification_css.closest('div.br-option-item').addClass('br-apply-disable');
+					group_css.closest('div.br-option-item').addClass('br-apply-disable');
+					include_inline_css.closest('div.br-option-item').addClass('br-apply-disable');
 				}
 			}
 		);
@@ -264,14 +274,25 @@ jQuery( document ).ready(
 
 				var include_inline_js = $( '#include-inline-js' );
 				var group_js          = $( '#group-js' );
+				var exclude_js          = $( '#exclude-js' );
 
 				if ( $( this ).is( ':checked' ) ) {
-					include_inline_js.removeAttr( 'disabled' );
-					group_js.removeAttr( 'disabled' );
-				} else {
-					include_inline_js.removeAttr( 'checked' ).attr( 'disabled', 'disabled' );
-					group_js.removeAttr( 'checked' ).attr( 'disabled', 'disabled' );
+					//include_inline_js.removeAttr( 'disabled' );
+					//group_js.removeAttr( 'disabled' );
 
+					exclude_js.closest('div.br-option-item').removeClass('br-apply-disable');
+					group_js.closest('div.br-option-item').removeClass('br-apply-disable');
+					include_inline_js.closest('div.br-option-item').removeClass('br-apply-disable');
+				} else {
+					//include_inline_js.removeAttr( 'checked' ).attr( 'disabled', 'disabled' );
+					//group_js.removeAttr( 'checked' ).attr( 'disabled', 'disabled' );
+					include_inline_js.prop( 'checked', false );
+					group_js.prop( 'checked', false );
+
+
+					exclude_js.closest('div.br-option-item').addClass('br-apply-disable');
+					group_js.closest('div.br-option-item').addClass('br-apply-disable');
+					include_inline_js.closest('div.br-option-item').addClass('br-apply-disable');
 				}
 			}
 		);
@@ -1198,9 +1219,9 @@ jQuery( document ).ready(
 
 	$( document ).on(
 		'change',
-		'#inherit-settings',
+		'input:radio[name="inherit-settings"]',
 		function () {
-			var is_selected = $( this ).is( ':checked' );
+			var is_selected = $('input:radio[name="inherit-settings"]:checked').val();
 			var is_network = '.br-is-network';
 			var is_custom = '.br-is-custom';
 			var tab_is = 'inherit';
@@ -1243,7 +1264,7 @@ jQuery( document ).ready(
 					complete: function ( jqXHR, textStatus ) {
 						$( '#wpcontent' ).find( 'div.br-inherit-wait' ).remove();
 
-						if ( true === is_selected ) {
+						if ( '0' === is_selected ) {
 							// custom is enabled
 							$( is_network ).removeClass( 'br-show' ).addClass( 'br-hide' );
 							$( is_custom ).removeClass( 'br-hide' ).addClass( 'br-show' );

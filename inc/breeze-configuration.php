@@ -518,7 +518,8 @@ class Breeze_Configuration {
 		}
 
 		$response         = array();
-		$inherit_settings = ( ( false === filter_var( $_POST['is-selected'], FILTER_VALIDATE_BOOLEAN ) ) ? '1' : '0' );
+		$inherit_settings = ( ( true === filter_var( $_POST['is-selected'], FILTER_VALIDATE_BOOLEAN ) ) ? '1' : '0' );
+
 		update_option( 'breeze_inherit_settings', $inherit_settings );
 		Breeze_ConfigCache::factory()->write();
 		Breeze_ConfigCache::factory()->write_config_cache();

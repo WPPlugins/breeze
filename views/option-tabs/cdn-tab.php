@@ -50,11 +50,13 @@ $icon                      = BREEZE_PLUGIN_URL . 'assets/images/cdn-active.png';
 				$is_enabled  = ( isset( $basic_value ) && true === $basic_value ) ? checked( $options['cdn-active'], '1', false ) : '';
 				?>
 				<div class="on-off-checkbox">
-					<input id="activate-cdn" name="activate-cdn" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?>>
-					<label for="activate-cdn">
-						<div class="status-switch" data-unchecked="OFF" data-checked="ON"></div>
-					</label>
+					<label class="br-switcher">
+						<input id="activate-cdn" name="activate-cdn" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?>>
+						<div class="br-see-state">
+						</div>
+					</label><br>
 				</div>
+
 				<div class="br-note">
 					<p>
 						<?php _e( 'Enable to make CDN effective on your website.', 'breeze' ); ?>
@@ -173,11 +175,13 @@ $icon                      = BREEZE_PLUGIN_URL . 'assets/images/cdn-active.png';
 				$is_enabled  = ( isset( $basic_value ) && true === $basic_value ) ? checked( $options['cdn-relative-path'], '1', false ) : '';
 				?>
 				<div class="on-off-checkbox">
-					<input id="cdn-relative-path" name="cdn-relative-path" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?>>
-					<label for="cdn-relative-path">
-						<div class="status-switch" data-unchecked="OFF" data-checked="ON"></div>
-					</label>
+					<label class="br-switcher">
+						<input id="cdn-relative-path" name="cdn-relative-path" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?>>
+						<div class="br-see-state">
+						</div>
+					</label><br>
 				</div>
+
 				<div class="br-note">
 					<p>
 						<?php
