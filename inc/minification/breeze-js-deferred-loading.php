@@ -479,6 +479,7 @@ class Breeze_Js_Deferred_Loading extends Breeze_MinificationBase {
 						}
 					}
 				} else {
+
 					if ( true === $this->is_inline_delay_on ) {
 						$is_delayed = $this->is_inline_delay( $tag );
 						if ( true === $is_delayed ) {
@@ -494,6 +495,7 @@ class Breeze_Js_Deferred_Loading extends Breeze_MinificationBase {
 							$content = str_replace( $tag, '', $content );
 						}
 					} else {
+
 						// Inline script
 						if ( $this->isremovable( $tag, $this->jsremovables ) ) {
 							$content = str_replace( $tag, '', $content );
@@ -742,10 +744,11 @@ class Breeze_Js_Deferred_Loading extends Breeze_MinificationBase {
 					#$defer = "true";
 					if ( false !== strpos( $js_path, 'INLINE;' ) ) {
 						$js_path = str_replace( 'INLINE;', '', $js_path );
+
 						if ( true === $this->delay_javascript && false === $this->ignore_from_delay( $js_url ) ) {
 							$js_head[] = '<div class="breeze-scripts-load" data-file="0" data-async="false" data-locate="head" data-defer="' . $delay_defer . '" style="display:none">' . htmlspecialchars( $js_path, ENT_QUOTES ) . '</div>' . "\n";
 						} else {
-							$js_head[] = "<script type='application/javascript' {$defer}>{$js_url}</script>\n";
+							$js_head[] = "<script type='application/javascript' {$defer}>{$js_path}</script>\n";
 						}
 					} else {
 						if ( true === $this->delay_javascript && false === $this->ignore_from_delay( $js_url ) ) {
@@ -758,6 +761,7 @@ class Breeze_Js_Deferred_Loading extends Breeze_MinificationBase {
 
 					//$js_head[] = "<script type='application/javascript' {$defer}src='{$js_url}'></script>\n";
 				}
+
 				$js_replacement = '';
 				$js_replacement .= implode( '', $js_head );
 				$this->inject_in_html( $js_replacement, $replaceTag );

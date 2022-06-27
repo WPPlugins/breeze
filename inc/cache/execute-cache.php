@@ -394,11 +394,11 @@ function breeze_cache( $buffer, $flags ) {
 
 	if ( strpos( $url_path, '_breeze_cache_' ) !== false ) {
 		if ( ! empty( $GLOBALS['breeze_config']['cache_options']['breeze-gzip-compression'] ) && function_exists( 'gzencode' ) ) {
-			$wp_filesystem->put_contents( $path . md5( $url_path . '/index.gzip.html' ) . '.php', $data );
-			$wp_filesystem->touch( $path . md5( $url_path . '/index.gzip.html' ) . '.php', $modified_time );
+			$wp_filesystem->put_contents( $path . md5( $url_path . '/index.gzip.html' ) . breeze_currency_switcher_cache() . '.php', $data );
+			$wp_filesystem->touch( $path . md5( $url_path . '/index.gzip.html' ) . breeze_currency_switcher_cache() . '.php', $modified_time );
 		} else {
-			$wp_filesystem->put_contents( $path . md5( $url_path . '/index.html' ) . '.php', $data );
-			$wp_filesystem->touch( $path . md5( $url_path . '/index.html' ) . '.php', $modified_time );
+			$wp_filesystem->put_contents( $path . md5( $url_path . '/index.html' ) . breeze_currency_switcher_cache() . '.php', $data );
+			$wp_filesystem->touch( $path . md5( $url_path . '/index.html' ) . breeze_currency_switcher_cache() . '.php', $modified_time );
 		}
 	} else {
 		return $buffer;
@@ -460,10 +460,11 @@ function breeze_serve_cache( $filename, $url_path, $X1, $opts ) {
 	}
 
 	if ( function_exists( 'gzencode' ) && ! empty( $GLOBALS['breeze_config']['cache_options']['breeze-gzip-compression'] ) ) {
-		$file_name = md5( $filename . '/index.gzip.html' ) . '.php';
+		$file_name = md5( $filename . '/index.gzip.html' ) . breeze_currency_switcher_cache() . '.php';
 	} else {
-		$file_name = md5( $filename . '/index.html' ) . '.php';
+		$file_name = md5( $filename . '/index.html' ) . breeze_currency_switcher_cache() . '.php';
 	}
+
 
 	$blog_id_requested = isset( $GLOBALS['breeze_config']['blog_id'] ) ? $GLOBALS['breeze_config']['blog_id'] : 0;
 	$path              = breeze_get_cache_base_path( false, $blog_id_requested ) . md5( $url_path ) . '/' . $file_name;

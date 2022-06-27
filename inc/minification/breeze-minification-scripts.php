@@ -1164,6 +1164,7 @@ class Breeze_MinificationScripts extends Breeze_MinificationBase {
 		$search_patterns = array(
 			'cs-vendor\.[a-zA-Z0-9]*\.js',
 			'cs\.[a-zA-Z0-9]*\.js',
+			#'woocommerce-currency-switcher/js/front.js',
 		);
 
 		$needle = trim( $needle );

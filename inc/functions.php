@@ -364,3 +364,27 @@ SCRIPT_TEST;
 
 	return $delay_script_js;
 }
+
+function breeze_currency_switcher_cache() {
+
+	$currency = '';
+	if ( isset( $GLOBALS['breeze_config']['curcy-wmc-type'] ) ) {
+		$currency_storage = $GLOBALS['breeze_config']['curcy-wmc-type'];
+		$name             = 'wmc_current_currency';
+
+		if ( 'session' === $currency_storage ) {
+			if ( ! session_id() ) {
+				@session_start();
+				$currency = isset( $_SESSION[ $name ] ) ? $_SESSION[ $name ] : '';
+			}
+		}
+		if ( 'cookie' === $currency_storage ) {
+			if ( empty( $currency ) ) {
+				$currency = isset( $_COOKIE[ $name ] ) ? $_COOKIE[ $name ] : '';
+
+			}
+		}
+	}
+
+	return $currency;
+}

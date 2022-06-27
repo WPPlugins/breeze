@@ -3,7 +3,7 @@ Contributors: Cloudways
 Tags: cache,caching, performance, wp-cache, cdn, combine, compress, speed plugin, database cache,gzip, http compression, js cache, minify, optimize, page cache, performance, speed, expire headers
 Requires at least: 4.5
 Tested up to: 6.0
-Stable tag: 2.0.5
+Stable tag: 2.0.6
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -144,6 +144,13 @@ Yes. The process of setting up CloudFlare with Breeze is easy. Check out the fol
 Using Gzip, Breeze compresses the request files, further reducing the size of the download files and speeding up the user experience.
 
 == Changelog ==
+
+= 2.0.6 =
+
+ * Fix: Overwrites the TimeZone To UTC of The Events Calendar plugin. 
+ * Fix: currency menu is cached with HTML, changing it with the currency is difficult in CURCY and WOOCS plugins.  
+ * Fix: Preloading links that do not have “href“ attribute or the “href“ attribute contains the value “#” was displaying errors in the console log.   
+ * Fix: Some inline javascript files were not displayed when the option "JS Files With Deferred Loading" had at least one value-added breaking functionality for other JavaScript scripts.   
 
 = 2.0.5 =
 

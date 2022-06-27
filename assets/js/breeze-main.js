@@ -1264,7 +1264,7 @@ jQuery( document ).ready(
 					complete: function ( jqXHR, textStatus ) {
 						$( '#wpcontent' ).find( 'div.br-inherit-wait' ).remove();
 
-						if ( '0' === is_selected ) {
+						if ( '0' === is_selected || true === is_selected ) {
 							// custom is enabled
 							$( is_network ).removeClass( 'br-show' ).addClass( 'br-hide' );
 							$( is_custom ).removeClass( 'br-hide' ).addClass( 'br-show' );

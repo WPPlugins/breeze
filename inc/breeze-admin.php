@@ -842,10 +842,26 @@ class Breeze_Admin {
 	 * Clear all cache action.
 	 */
 	public function breeze_clear_all_cache() {
+		global $post;
+		$flush_cache = false;
+
+		if ( ! empty( $post ) ) {
+			$post_type = get_post_type( $post->ID );
+
+			$flush_cache = true;
+			if ( 'tribe_events' === $post_type ) {
+				$flush_cache = false;
+			}
+		}
+
+		if ( true === $flush_cache && isset( $_GET['post_type'] ) && 'tribe_events' === $_GET['post_type'] ) {
+			$flush_cache = false;
+		}
+
 		//delete minify
 		Breeze_MinificationCache::clear_minification();
 		//clear normal cache
-		Breeze_PurgeCache::breeze_cache_flush();
+		Breeze_PurgeCache::breeze_cache_flush( $flush_cache );
 		//clear varnish cache
 		$this->breeze_clear_varnish();
 	}
