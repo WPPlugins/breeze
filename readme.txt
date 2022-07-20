@@ -3,7 +3,7 @@ Contributors: Cloudways
 Tags: cache,caching, performance, wp-cache, cdn, combine, compress, speed plugin, database cache,gzip, http compression, js cache, minify, optimize, page cache, performance, speed, expire headers
 Requires at least: 4.5
 Tested up to: 6.0
-Stable tag: 2.0.6
+Stable tag: 2.0.7
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -145,6 +145,11 @@ Using Gzip, Breeze compresses the request files, further reducing the size of th
 
 == Changelog ==
 
+= 2.0.7 =
+
+ * Fix: In some cases call to undefined function is_plugin_active() shows, it is fixed now by replacing it with a check for class_exist in CURCY and WOOCS plugins.
+ 
+ 
 = 2.0.6 =
 
  * Fix: Overwrites the TimeZone To UTC of The Events Calendar plugin. 

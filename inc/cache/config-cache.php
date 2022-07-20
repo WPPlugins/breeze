@@ -216,8 +216,8 @@ class Breeze_ConfigCache {
 
 		//  CURCY - WooCommerce Multi Currency Premium.
 		if (
-			is_plugin_active( 'woocommerce-multi-currency/woocommerce-multi-currency.php' ) ||
-			is_plugin_active( 'woo-multi-currency/woo-multi-currency.php' )
+			class_exists( 'WOOMULTI_CURRENCY' ) ||
+			class_exists( 'WOOMULTI_CURRENCY_F')
 		) {
 			if ( empty( $wmc_settings ) ) {
 				// if $wmc_settings is empty, we will check again.
@@ -243,7 +243,7 @@ class Breeze_ConfigCache {
 		// WOOCS - WooCommerce Currency Switcher
 		$woocs_is_active = false;
 		if (
-			is_plugin_active( 'woocommerce-currency-switcher/index.php' )
+			class_exists( 'WOOCS_STARTER' )
 		) {
 			$woocs_is_active = true;
 		}
