@@ -183,21 +183,23 @@ class Breeze_Admin {
 		}
 
 		$token_name = array(
-			'breeze_purge_varnish'  => '',
-			'breeze_purge_database' => '',
-			'breeze_purge_cache'    => '',
-			'breeze_save_options'   => '',
-			'breeze_purge_opcache'  => '',
+			'breeze_purge_varnish'   => '',
+			'breeze_purge_database'  => '',
+			'breeze_purge_cache'     => '',
+			'breeze_save_options'    => '',
+			'breeze_purge_opcache'   => '',
+			'breeze_import_settings' => '',
 		);
 
 		// Only create the security nonce if the user has manage_options ( administrator capabilities ).
 		if ( false === breeze_is_restricted_access( true ) ) {
 			$token_name = array(
-				'breeze_purge_varnish'  => wp_create_nonce( '_breeze_purge_varnish' ),
-				'breeze_purge_database' => wp_create_nonce( '_breeze_purge_database' ),
-				'breeze_purge_cache'    => wp_create_nonce( '_breeze_purge_cache' ),
-				'breeze_save_options'   => wp_create_nonce( '_breeze_save_options' ),
-				'breeze_purge_opcache'  => wp_create_nonce( '_breeze_purge_opcache' ),
+				'breeze_purge_varnish'   => wp_create_nonce( '_breeze_purge_varnish' ),
+				'breeze_purge_database'  => wp_create_nonce( '_breeze_purge_database' ),
+				'breeze_purge_cache'     => wp_create_nonce( '_breeze_purge_cache' ),
+				'breeze_save_options'    => wp_create_nonce( '_breeze_save_options' ),
+				'breeze_purge_opcache'   => wp_create_nonce( '_breeze_purge_opcache' ),
+				'breeze_import_settings' => wp_create_nonce( '_breeze_import_settings' ),
 			);
 		}
 

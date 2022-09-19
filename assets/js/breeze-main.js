@@ -796,7 +796,8 @@ jQuery( document ).ready(
 					breeze_data.append( 'action', 'breeze_import_json' );
 					breeze_data.append( 'network_level', network );
 					breeze_data.append( 'breeze_import_file', the_file );
-
+					breeze_data.append( 'security', breeze_token_name.breeze_import_settings );
+ 
 					var filename_holder = $( '#file-selected' );
 					var filename_error  = $( '#file-error' );
 					var import_settings = '<div class="br-loader-spinner import_settings"><div></div><div></div><div></div><div></div></div>';
