@@ -258,7 +258,7 @@ class Breeze_Lazy_Load {
 			}
 		}
 
-		return $html_dom->saveHTML();
+		return $html_dom->saveHTML( $html_dom->documentElement );
 	}
 
 	/**

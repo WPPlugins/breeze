@@ -624,6 +624,10 @@ class Breeze_Ecommerce_Cache {
 	 * Remove '/' chacracter of end url
 	 */
 	public function rtrim_urls( $url ) {
+		if ( empty( $url ) || ! is_string( $url ) ) {
+			return $url;
+		}
+
 		return rtrim( $url, '/' );
 	}
 
