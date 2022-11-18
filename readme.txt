@@ -1,9 +1,9 @@
 === Breeze - WordPress Cache Plugin ===
 Contributors: Cloudways
 Tags: cache,caching, performance, wp-cache, cdn, combine, compress, speed plugin, database cache,gzip, http compression, js cache, minify, optimize, page cache, performance, speed, expire headers
-Requires at least: 5.9
+Requires at least: 6.0
 Tested up to: 6.1
-Stable tag: 2.0.11
+Stable tag: 2.0.12
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -144,6 +144,11 @@ Using Gzip, Breeze compresses the request files, further reducing the size of th
 
 == Changelog ==
 
+= 2.0.12=
+ 
+* Fix: Synchronized the reset cache option of the Avada theme with Breeze.
+
+ 
 = 2.0.11=
 
 * Add: Scanning of CDN URL to verify it is not malicious in the CDN.
@@ -429,4 +434,4 @@ Update Breeze through WordPress Admin > Dashboard >Updates. The settings will re
 
 == Requirements ==
 
-PHP 7.x ,PHP 7.4, PHP 8 recommended for better performance, WordPress 5.9+
+PHP 7.4, PHP 8 recommended for better performance, WordPress 6.0+
