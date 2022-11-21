@@ -275,6 +275,8 @@ function breeze_cache( $buffer, $flags ) {
 		$home_url = $GLOBALS['breeze_config']['homepage'];
 		$home_url = ltrim( $home_url, 'https:' );
 
+		$buffer = mb_convert_encoding( $buffer, 'HTML-ENTITIES', 'UTF-8' );
+
 		$html_dom                     = new \DOMDocument();
 		$html_dom->preserveWhiteSpace = false;// phpcs:ignore
 		$html_dom->formatOutput       = false;// phpcs:ignore
@@ -327,7 +329,8 @@ function breeze_cache( $buffer, $flags ) {
 				}
 			}
 		}
-		$buffer = $html_dom->saveHTML( $html_dom->documentElement );
+		//$buffer = $html_dom->saveHTML( $html_dom->documentElement );
+		$buffer = $html_dom->saveHTML();
 		// ------------------------------------------------------------------------------------------
 
 	}
