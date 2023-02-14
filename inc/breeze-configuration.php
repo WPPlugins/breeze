@@ -214,6 +214,14 @@ class Breeze_Configuration {
 			}
 		}
 
+		$is_minification_js        = ( isset( $_POST['minification-js'] ) ? '1' : '0' );
+		$is_inline_minification_js = ( isset( $_POST['include-inline-js'] ) ? '1' : '0' );
+		$is_group_js               = ( isset( $_POST['group-js'] ) ? '1' : '0' );
+
+		if ( 0 === absint( $is_minification_js ) || 0 === absint( $is_inline_minification_js ) ) {
+			//$is_group_js = '0';
+		}
+
 		$file_settings = array(
 			'breeze-minify-html'        => ( isset( $_POST['minification-html'] ) ? '1' : '0' ),
 			// --
@@ -223,9 +231,9 @@ class Breeze_Configuration {
 			'breeze-exclude-css'        => $exclude_css,
 			'breeze-include-inline-css' => ( isset( $_POST['include-inline-css'] ) ? '1' : '0' ),
 			// --
-			'breeze-minify-js'          => ( isset( $_POST['minification-js'] ) ? '1' : '0' ),
-			'breeze-group-js'           => ( isset( $_POST['group-js'] ) ? '1' : '0' ),
-			'breeze-include-inline-js'  => ( isset( $_POST['include-inline-js'] ) ? '1' : '0' ),
+			'breeze-minify-js'          => $is_minification_js,
+			'breeze-group-js'           => $is_group_js,
+			'breeze-include-inline-js'  => $is_inline_minification_js,
 			'breeze-exclude-js'         => $exclude_js,
 			'breeze-move-to-footer-js'  => $move_to_footer_js,
 			'breeze-defer-js'           => $defer_js,
@@ -1140,7 +1148,6 @@ class Breeze_Configuration {
 				}
 
 
-
 				$select_expired = $wpdb->get_results(
 					$wpdb->prepare(
 						"
@@ -1260,7 +1267,7 @@ class Breeze_Configuration {
 				}
 				break;
 			case 'optimize_database':
-				$all_db_tables = array();
+				$all_db_tables   = array();
 				$total_of_tables = 0;
 				if ( defined( 'WP_NETWORK_ADMIN' ) || ! is_multisite() ) {
 					$sql_get = $wpdb->get_results(
@@ -1270,7 +1277,7 @@ class Breeze_Configuration {
 						foreach ( $sql_get as $db_table ) {
 							$all_db_tables[] = $db_table->TABLE_NAME;
 						}
-						$total_of_tables = count($all_db_tables);
+						$total_of_tables = count( $all_db_tables );
 					}
 
 				} else {
@@ -1289,7 +1296,7 @@ class Breeze_Configuration {
 							if ( isset( $tables_list[0] ) && ! empty( $tables_list[0] ) ) {
 								$all_db_tables = $tables_list[0];
 							}
-							$total_of_tables = count($all_db_tables);
+							$total_of_tables = count( $all_db_tables );
 						}
 
 					} else {
@@ -1300,7 +1307,7 @@ class Breeze_Configuration {
 							foreach ( $sql_get as $db_table ) {
 								$all_db_tables[] = $db_table->TABLE_NAME;
 							}
-							$total_of_tables = count($all_db_tables);
+							$total_of_tables = count( $all_db_tables );
 						}
 					}
 				}
@@ -1321,7 +1328,7 @@ class Breeze_Configuration {
 				}
 				$db_count ++;
 				if ( isset( $only_these_tables[ $db_count ] ) ) {
-					$return_value = array( 'optmize_no' => $db_count, 'db_total' => $total_of_tables);
+					$return_value = array( 'optmize_no' => $db_count, 'db_total' => $total_of_tables );
 				} else {
 					$return_value = true;
 				}
@@ -1473,9 +1480,9 @@ class Breeze_Configuration {
 				break;
 			case 'optimize_database':
 				if ( defined( 'WP_NETWORK_ADMIN' ) || ! is_multisite() ) {
-				$return = $wpdb->get_var(
-					$wpdb->prepare( 'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE `TABLE_SCHEMA`=%s AND (`ENGINE`=%s OR `ENGINE`=%s OR `ENGINE`=%s)', DB_NAME, 'InnoDB', 'MyISAM', 'ARCHIVE' )
-				);
+					$return = $wpdb->get_var(
+						$wpdb->prepare( 'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE `TABLE_SCHEMA`=%s AND (`ENGINE`=%s OR `ENGINE`=%s OR `ENGINE`=%s)', DB_NAME, 'InnoDB', 'MyISAM', 'ARCHIVE' )
+					);
 				} else {
 					$blog_id = (int) $wpdb->blogid;
 					$return  = 0;
@@ -1491,7 +1498,7 @@ class Breeze_Configuration {
 							preg_match_all( '/(wp_[^_\d_].*)/i', $table_list, $tables_list );
 
 							if ( isset( $tables_list[0] ) && ! empty( $tables_list[0] ) ) {
-								$return = count( $tables_list[0] ) ;
+								$return = count( $tables_list[0] );
 							}
 						}
 
@@ -1798,9 +1805,9 @@ class Breeze_Configuration {
 				$action_result = self::clean_system( $item );
 				if ( ! is_bool( $action_result ) ) {
 					$to_return = $action_result;
+				}
 			}
 		}
-	}
 
 		return $to_return;
 	}
@@ -1816,18 +1823,30 @@ class Breeze_Configuration {
 		check_ajax_referer( '_breeze_reset_default', 'security' );
 		set_as_network_screen();
 
-		$response = self::reset_to_default();
-		wp_send_json( array( 'success' => $response ) );
+		$is_blog_id = 0;
+		if ( true === filter_var( $_POST['is-network'], FILTER_VALIDATE_BOOLEAN ) ) {
+			$is_blog_id = 'network';
+		}
+		$response = self::reset_to_default( $is_blog_id, $_POST['is-network'] );
+		wp_send_json( $response );
 	}
 
 	/**
 	 * Reset all options to default
 	 *
+	 * @param $blog_id
+	 * @param $is_network
+	 *
 	 * @return bool
 	 */
-	public static function reset_to_default( $blog_id = null ) {
-
+	public static function reset_to_default( $blog_id = null, $is_network = 'false' ) {
+		set_as_network_screen();
 		// Default basic
+
+		if ( ! empty( $blog_id ) && is_numeric( $blog_id ) ) {
+			$blog_id = intval( $blog_id );
+		}
+
 		$all_user_roles     = breeze_all_wp_user_roles();
 		$active_cache_users = array();
 		foreach ( $all_user_roles as $usr_role ) {
@@ -1954,25 +1973,39 @@ class Breeze_Configuration {
 
 		if ( is_multisite() ) {
 
-			if ( $blog_id == 'network' ) {
-				breeze_update_option( 'basic_settings', $basic );
+			if ( true === filter_var( $is_network, FILTER_VALIDATE_BOOLEAN ) || 'network' === $blog_id ) {
 
-				breeze_update_option( 'advanced_settings', $advanced );
-
-				breeze_update_option( 'heartbeat_settings', $heartbeat );
-
-				breeze_update_option( 'preload_settings', $preload );
-
-				$save_advanced = $file;
-
+				// get file setting
+				$save_advanced                            = $file;
 				$save_advanced['breeze-delay-js-scripts'] = $breeze_delay_js_scripts;
 
-				breeze_update_option( 'file_settings', $save_advanced, true );
+				// Update each blog to default
+				$blogs = get_sites();
+				foreach ( $blogs as $blog ) {
 
+					update_blog_option( $blog->blog_id, 'breeze_basic_settings', $basic );
+					update_blog_option( $blog->blog_id, 'breeze_advanced_settings', $advanced );
+					update_blog_option( $blog->blog_id, 'breeze_heartbeat_settings', $heartbeat );
+					update_blog_option( $blog->blog_id, 'breeze_preload_settings', $preload );
+					update_blog_option( $blog->blog_id, 'breeze_file_settings', $save_advanced );
+					update_blog_option( $blog->blog_id, 'breeze_cdn_integration', $cdn );
+					update_blog_option( $blog->blog_id, 'breeze_varnish_cache', $varnish );
+				}
+
+				breeze_update_option( 'basic_settings', $basic );
+				breeze_update_option( 'advanced_settings', $advanced );
+				breeze_update_option( 'heartbeat_settings', $heartbeat );
+				breeze_update_option( 'preload_settings', $preload );
 				breeze_update_option( 'cdn_integration', $cdn );
 				breeze_update_option( 'varnish_cache', $varnish );
+
+				$file_setting                            = $file;
+				$file_setting['breeze-delay-js-scripts'] = $breeze_delay_js_scripts;
+
+				breeze_update_option( 'file_settings', $file_setting );
+
 			} else {
-				if ( ! $blog_id ) {
+				if ( empty( $blog_id ) ) {
 					$blog_id = get_current_blog_id();
 				}
 
@@ -1980,45 +2013,71 @@ class Breeze_Configuration {
 				update_blog_option( $blog_id, 'breeze_advanced_settings', $advanced );
 				update_blog_option( $blog_id, 'breeze_heartbeat_settings', $heartbeat );
 				update_blog_option( $blog_id, 'breeze_preload_settings', $preload );
+				update_blog_option( $blog_id, 'breeze_cdn_integration', $cdn );
+				update_blog_option( $blog_id, 'breeze_varnish_cache', $varnish );
 
 				$save_file                            = $file;
 				$save_file['breeze-delay-js-scripts'] = $breeze_delay_js_scripts;
-
 				update_blog_option( $blog_id, 'breeze_file_settings', $save_file );
 			}
 
-
-			Breeze_ConfigCache::factory()->write_config_cache( true );
 		} else {
 			breeze_update_option( 'basic_settings', $basic );
 			breeze_update_option( 'advanced_settings', $advanced );
 			breeze_update_option( 'heartbeat_settings', $heartbeat );
 			breeze_update_option( 'preload_settings', $preload );
+			breeze_update_option( 'cdn_integration', $cdn );
+			breeze_update_option( 'varnish_cache', $varnish );
 
-			$save_advanced = $file;
-
+			$save_advanced                            = $file;
 			$save_advanced['breeze-delay-js-scripts'] = $breeze_delay_js_scripts;
-
 			breeze_update_option( 'file_settings', $save_advanced, true );
 
-			breeze_update_option( 'cdn_integration', $cdn );
-
-			breeze_update_option( 'varnish_cache', $varnish );
 		}
 
 		//add header to htaccess if setting is enabled or by default if first installed
 		Breeze_Configuration::update_htaccess();
 
-		//automatic config start cache
-		Breeze_ConfigCache::factory()->write();
-		Breeze_ConfigCache::factory()->write_config_cache();
+		if ( ! empty( $blog_id ) && is_numeric( $blog_id ) ) { // Multisite sub-blog
+			switch_to_blog( $blog_id );
+
+			//automatic config start cache
+			Breeze_ConfigCache::factory()->write();
+			Breeze_ConfigCache::factory()->write_config_cache();
+			//delete cache after settings
+			do_action( 'breeze_clear_all_cache' );
+
+			restore_current_blog();
+
+		} elseif ( 'network' === $blog_id ) { // Multisite network
+			$blogs = get_sites();
+			foreach ( $blogs as $blog ) {
+				switch_to_blog( $blog_id );
+				//automatic config start cache
+				Breeze_ConfigCache::factory()->write();
+				Breeze_ConfigCache::factory()->write_config_cache();
+				//delete cache after settings
+				do_action( 'breeze_clear_all_cache' );
+				restore_current_blog();
+			}
+		} elseif ( empty( $blog_id ) ) { // Single site
+			//automatic config start cache
+			Breeze_ConfigCache::factory()->write();
+			Breeze_ConfigCache::factory()->write_config_cache();
+			//delete cache after settings
+			do_action( 'breeze_clear_all_cache' );
+		}
 
 		if ( ! empty( $basic ) && ! empty( $basic['breeze-active'] ) ) {
 			Breeze_ConfigCache::factory()->toggle_caching( true );
 		}
 
-		//delete cache after settings
-		do_action( 'breeze_clear_all_cache' );
+
+		if ( is_multisite() ) {
+			if ( true === filter_var( $is_network, FILTER_VALIDATE_BOOLEAN ) || 'network' === $blog_id ) {
+				Breeze_ConfigCache::factory()->write_config_cache( true );
+			}
+		}
 
 		return true;
 	}

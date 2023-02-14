@@ -139,13 +139,13 @@ if ( ! empty( $_COOKIE ) ) {
 
 	if ( ! empty( $_COOKIE['breeze_commented_posts'] ) ) {
 		foreach ( $_COOKIE['breeze_commented_posts'] as $path ) {
-			if(!empty($path)){
-				$path = '';
+			if ( ! empty( $path ) ) {
+				if ( rtrim( $path, '/' ) === rtrim( $_SERVER['REQUEST_URI'], '/' ) ) {
+					// User commented on this post
+					return;
+				}
 			}
-			if ( rtrim( $path, '/' ) === rtrim( $_SERVER['REQUEST_URI'], '/' ) ) {
-				// User commented on this post
-				return;
-			}
+
 		}
 	}
 }
@@ -281,6 +281,14 @@ function breeze_cache( $buffer, $flags ) {
 		$html_dom->preserveWhiteSpace = false;// phpcs:ignore
 		$html_dom->formatOutput       = false;// phpcs:ignore
 
+		preg_match_all( '#<script.*</script>#Usmi', $buffer, $script_matches );
+
+		if ( ! empty( $script_matches ) && ! empty( $script_matches[0][0] ) ) {
+			foreach ( $script_matches[0] as $index => $script_js ) {
+				$buffer = str_replace( $script_js, '{BREEZE_SCRIPT_PH' . $index . '}', $buffer );
+			}
+		}
+
 		libxml_use_internal_errors( true );
 		$html_dom->loadHTML( $buffer, LIBXML_NOERROR );  // | LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
 
@@ -330,7 +338,15 @@ function breeze_cache( $buffer, $flags ) {
 			}
 		}
 		//$buffer = $html_dom->saveHTML( $html_dom->documentElement );
-		$buffer = $html_dom->saveHTML();
+		$content_return = $html_dom->saveHTML();
+
+		if ( ! empty( $script_matches ) && ! empty( $script_matches[0][0] ) ) {
+			foreach ( $script_matches[0] as $index => $script_js ) {
+				$content_return = str_replace( '{BREEZE_SCRIPT_PH' . $index . '}', $script_js, $content_return );
+			}
+		}
+
+		$buffer = $content_return;
 		// ------------------------------------------------------------------------------------------
 
 	}
@@ -441,7 +457,7 @@ function breeze_get_url_path() {
 
 	$host   = ( isset( $_SERVER['HTTP_HOST'] ) ) ? $_SERVER['HTTP_HOST'] : '';
 	$domain = ( ( ( ! empty( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] !== 'off' ) || ( ! empty( $_SERVER['SERVER_PORT'] ) && $_SERVER['SERVER_PORT'] == 443 ) ) ? 'https://' : 'http://' );
-	if(empty($host)){
+	if ( empty( $host ) ) {
 		$host = '';
 	}
 	$the_url = $domain . rtrim( $host, '/' ) . $_SERVER['REQUEST_URI'];

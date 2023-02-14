@@ -1061,6 +1061,8 @@ class Breeze_Admin {
 	 * Clear all cache action.
 	 */
 	public function breeze_clear_all_cache() {
+		set_as_network_screen();
+
 		global $post;
 		$flush_cache = false;
 
@@ -1080,8 +1082,7 @@ class Breeze_Admin {
 		if ( is_multisite() && ! is_network_admin() ) {
 
 			// Show settings inherit option.
-			$inherit_settings = get_option( 'breeze_inherit_settings', '0' );
-
+			$inherit_settings      = get_option( 'breeze_inherit_settings', '0' );
 			$is_inherited_settings = isset( $inherit_settings ) ? filter_var( $inherit_settings, FILTER_VALIDATE_BOOLEAN ) : false;
 
 			if ( true === $is_inherited_settings ) {
@@ -1106,11 +1107,13 @@ class Breeze_Admin {
 			$main->purge_cache( $homepage );
 			Breeze_PurgeCache::__flush_object_cache();
 
-
 		} else {
-
+			$current_blog_id = null;
 			//delete minify
-			Breeze_MinificationCache::clear_minification();
+			if ( is_multisite() ) {
+				$current_blog_id = get_current_blog_id();
+			}
+			Breeze_MinificationCache::clear_minification( $current_blog_id );
 			//clear normal cache
 			Breeze_PurgeCache::breeze_cache_flush( $flush_cache );
 			//clear varnish cache

@@ -4,7 +4,7 @@ Tags: cache,caching, performance, wp-cache, cdn, combine, compress, speed plugin
 Requires at least: 6.0
 Tested up to: 6.1
 Requires PHP: 7.4
-Stable tag: 2.0.15
+Stable tag: 2.0.16
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -144,6 +144,15 @@ Yes. The process of setting up CloudFlare with Breeze is easy. Check out the fol
 Using Gzip, Breeze compresses the request files, further reducing the size of the download files and speeding up the user experience.
 
 == Changelog ==
+
+= 2.0.16=
+
+
+* Fix: Ninja Forms now works when Lazy Load Images and Cross-Origin Safe Links are enabled.
+* Fix: All types of Google Tag Manager scripts will work with the "Delay JS Inline Scripts" option.
+* Add: "Reset Now" option has been added for default settings. It can also operate with WP-CLI.
+* Add: Enabled "Combine JS" option will disable "Delay JS Inline Script" or "Delay All JavaScript" and vice versa.
+
 
 = 2.0.15=
 

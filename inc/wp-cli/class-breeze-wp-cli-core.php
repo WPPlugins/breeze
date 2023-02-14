@@ -31,6 +31,10 @@ class Breeze_WP_Cli_Core extends \WP_CLI_Command {
 		WP_CLI::line( WP_CLI::colorize( '%Y--level=%n%G<network|blogid>%n (%Mfor multisite only%n). %Cnetwork%n as value, will import to Breeze network settings. %CblogID%n value must be numeric and will import the Breeze settings for the given blogID' ) );
 		WP_CLI::line( '---' );
 
+		WP_CLI::line( WP_CLI::colorize( 'Command to reset settings to default values %Ywp breeze reset --level=<network|blogID>%n ' ) );
+		WP_CLI::line( WP_CLI::colorize( '%Y--level=<network|blogID>%n (%Mfor multisite only%n). If on multisite and this parameter is not specified then all breeze settigns will reset to default' ) );
+		WP_CLI::line( '---' );
+
 		return;
 	}
 
@@ -383,42 +387,51 @@ class Breeze_WP_Cli_Core extends \WP_CLI_Command {
 
 	}
 
-    /**
-     * Reset breeze to default setting using WP-CLI
-     *
-     * @param $args
-     * @param $assoc_args
-     * @return void
-     *
-     * @since 2.0.9
-     * @access public
-     */
-    function reset( $args, $assoc_args ) {
+	/**
+	 * Reset breeze to default setting using WP-CLI
+	 *
+	 * @param $args
+	 * @param $assoc_args
+	 *
+	 * @return void
+	 *
+	 * @since 2.0.9
+	 * @access public
+	 */
+	function reset( $args, $assoc_args ) {
 
-        $site_id = 0;
+		$site_id    = 0;
+		$is_network = 'false';
+		if ( is_multisite() && isset( $assoc_args['level'] ) ) {
+			$site_id = $assoc_args['level'];
 
-        if ( is_multisite() && isset( $assoc_args['level'] ) ) {
-            $site_id = $assoc_args['level'];
-        }
+		}
 
-        WP_CLI::line( WP_CLI::colorize( '%YReseting to default%n' ) );
+		WP_CLI::line( WP_CLI::colorize( '%YReseting to default%n' ) );
 
-        if ( is_multisite() && ! $site_id ) {
-            WP_CLI::line( PHP_EOL );
-            WP_CLI::line( WP_CLI::colorize( '%ROn a multisite instance if you don\'t specify the site id by --level=$id|network all breeze settins will reset (default network).%n' ) );
-            WP_CLI::confirm( 'Are you sure you want to continue?' );
-        }
+		if ( is_multisite() && ! $site_id ) {
+			WP_CLI::line( PHP_EOL );
+			WP_CLI::line( WP_CLI::colorize( '%ROn a multisite instance if you don\'t specify the site id by --level=$id|network all breeze settings will reset (default network).%n' ) );
+			WP_CLI::confirm( 'Are you sure you want to continue?' );
 
-        $reset_default = Breeze_Configuration::reset_to_default( $site_id );
+			$site_id    = 'network';
+			$is_network = 'true';
+		}
 
-        if ( $reset_default ) {
-            WP_CLI::line( WP_CLI::colorize( '%GDone%n.' ) );
-        } else {
-            WP_CLI::error(
-                __( 'Something went wrong', 'breeze' )
-            );
-        }
-    }
+		if ( ! empty( $site_id ) && ! is_numeric( $site_id ) ) {
+			$is_network = 'true';
+		}
+
+		$reset_default = Breeze_Configuration::reset_to_default( $site_id, $is_network );
+
+		if ( $reset_default ) {
+			WP_CLI::line( WP_CLI::colorize( '%GDone%n.' ) );
+		} else {
+			WP_CLI::error(
+				__( 'Something went wrong', 'breeze' )
+			);
+		}
+	}
 
 }
 
