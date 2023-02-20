@@ -1,7 +1,4 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
 
 class Breeze_Query_Strings_Rules {
 
@@ -37,10 +34,6 @@ class Breeze_Query_Strings_Rules {
 		'adgroupid',
 		'adid',
 		'gclid',
-		'gad_source',
-		'gad_campaignid',
-		'gbraid',
-		'wbraid',
 		'age-verified',
 		'ao_noptimize',
 		'usqp',
@@ -61,7 +54,6 @@ class Breeze_Query_Strings_Rules {
 		'gdftrk',
 		'gdffi',
 		'_ke',
-		'_kx',
 		'redirect_log_mongo_id',
 		'redirect_mongo_id',
 		'sb_referer_host',
@@ -84,16 +76,13 @@ class Breeze_Query_Strings_Rules {
 		'lang',
 		'permalink_name',
 		'lp-variation-id',
-		'page',
-		'paged',
 	);
 
 	// Hold the class instance.
 	private static $instance = null;
 
 	function __construct() {
-		// Include necessary helper functions.
-		require_once $this->trailingslashit( dirname( __FILE__ ) ) . '/helpers.php';
+
 	}
 
 	public static function get_instance() {
@@ -104,35 +93,10 @@ class Breeze_Query_Strings_Rules {
 		return self::$instance;
 	}
 
-	/**
-	 * Appends a trailing slash.
-	 * @param $value the path.
-	 * @return string path with a trailing slash added.
-	 */
-	public function trailingslashit( $value ) {
-		return rtrim( $value, '/\\' ) . '/';
-	}
-
 	public function fetch_ignored_list() {
 		$this->ignored_list = apply_filters( 'breeze_ignored_query_strings_list', $this->ignored_list );
 
 		return $this->ignored_list;
-	}
-
-	/**
-	 * Checks if a query var name is on the permanently ignored list.
-	 *
-	 * Exact match only (same idea as WP Rocket). Lookalikes with spaces, tabs,
-	 * or different casing are not ignored, so they stay as unknown params and
-	 * the page is not cached. Both the cache key and the request strip use this
-	 * same check, so they cannot disagree.
-	 *
-	 * @param string $name Query var name as it appears in the URL.
-	 *
-	 * @return bool
-	 */
-	public function is_ignored_query_var( $name ) {
-		return in_array( (string) $name, $this->fetch_ignored_list(), true );
 	}
 
 	public static function when_woocommerce_settings_save() {
@@ -141,58 +105,8 @@ class Breeze_Query_Strings_Rules {
 		}
 	}
 
-	/**
-	 * Adds the tracking vars Breeze removed from the request back onto a same-site
-	 * redirect, so "/page?utm_source=x" lands on "/page/?utm_source=x".
-	 *
-	 * @param string $location Redirect URL.
-	 *
-	 * @return string
-	 */
-	public static function add_stripped_vars_to_redirect( $location ) {
-		if ( empty( $GLOBALS['breeze_stripped_query_vars'] ) || ! is_array( $GLOBALS['breeze_stripped_query_vars'] ) || ! is_string( $location ) || '' === $location ) {
-			return $location;
-		}
-
-		// Visitor values are never passed on to another site, including hosts
-		// added through allowed_redirect_hosts. Relative redirects have no host.
-		$validated = wp_validate_redirect( $location, false );
-		if ( ! $validated ) {
-			return $location;
-		}
-
-		$host = wp_parse_url( $validated, PHP_URL_HOST );
-		if ( null !== $host && strtolower( (string) $host ) !== strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) ) {
-			return $location;
-		}
-
-		wp_parse_str( (string) wp_parse_url( $location, PHP_URL_QUERY ), $existing );
-		$vars = array_diff_key( array_filter( $GLOBALS['breeze_stripped_query_vars'], 'is_string' ), $existing );
-		if ( empty( $vars ) ) {
-			return $location;
-		}
-
-		// The redirect now holds this visitor's values, so Varnish/CDN must not share it.
-		nocache_headers();
-
-		return add_query_arg( array_map( 'rawurlencode', $vars ), $location );
-	}
-
 	public function fetch_always_cache_list() {
 		$this->always_cache_query = apply_filters( 'breeze_always_cache_query_strings', $this->always_cache_query );
-
-		// Append user-defined "Cache Query Strings" from Breeze settings so each value generates a separate cache.
-		if (
-			isset( $GLOBALS['breeze_config'], $GLOBALS['breeze_config']['cached-query-strings'] ) &&
-			! empty( $GLOBALS['breeze_config']['cached-query-strings'] ) &&
-			is_array( $GLOBALS['breeze_config']['cached-query-strings'] )
-		) {
-			$this->always_cache_query = array_merge(
-				$this->always_cache_query,
-				array_values( $GLOBALS['breeze_config']['cached-query-strings'] )
-			);
-			$this->always_cache_query = array_unique( $this->always_cache_query );
-		}
 
 		// woocommerce_geolocation_ajax
 		if ( isset( $GLOBALS['breeze_config']['woocommerce_geolocation_ajax_inherit'] ) && ! empty( $GLOBALS['breeze_config']['woocommerce_geolocation_ajax_inherit'] ) ) {
@@ -205,7 +119,8 @@ class Breeze_Query_Strings_Rules {
 			) {
 				$this->always_cache_query[] = 'v';
 			}
-		} elseif ( isset( $GLOBALS['breeze_config']['woocommerce_geolocation_ajax'] ) && 1 === (int) $GLOBALS['breeze_config']['woocommerce_geolocation_ajax'] ) {
+
+		} else if ( isset( $GLOBALS['breeze_config']['woocommerce_geolocation_ajax'] ) && 1 === (int) $GLOBALS['breeze_config']['woocommerce_geolocation_ajax'] ) {
 			$this->always_cache_query[] = 'v';
 		}
 
@@ -227,6 +142,8 @@ class Breeze_Query_Strings_Rules {
 				$this->always_cache_query[] = 'day';
 				$this->always_cache_query[] = 'monthnum';
 				$this->always_cache_query[] = 'year';
+				$this->always_cache_query[] = 'page';
+				$this->always_cache_query[] = 'paged';
 				$this->always_cache_query[] = 'category';
 				$this->always_cache_query[] = 'taxonomy';
 				$this->always_cache_query[] = 'tag';
@@ -288,10 +205,12 @@ class Breeze_Query_Strings_Rules {
 					$cache_page = false;
 					break;
 				}
+
 			}
 			if ( false === $cache_page ) {
 				return false;
 			}
+
 
 			// IF user defines query strings that can be cached.
 			if (
@@ -333,43 +252,36 @@ class Breeze_Query_Strings_Rules {
 			return false;
 		}
 
-		foreach ( array_keys( $this->extract_query_strings( $url ) ) as $index ) {
-			if ( $this->is_ignored_query_var( $index ) ) {
-				return true;
+		$ignored_list = $this->fetch_ignored_list();
+
+		$current_url_query = parse_url( $url, PHP_URL_QUERY );
+		parse_str( $current_url_query, $breeze_query_output );
+
+		$found_index = false;
+		foreach ( $breeze_query_output as $index => $value ) {
+			$index = mb_strtolower( trim( $index ) );
+			if ( in_array( $index, $ignored_list, true ) ) {
+				$found_index = true;
+				break;
 			}
 		}
 
-		return false;
+		return $found_index;
 	}
 
-	/**
-	 * Extracts the query vars from a URL, keeping each name exactly as it was sent.
-	 *
-	 * parse_url() and parse_str() are not used here: both rewrite characters inside
-	 * a name (a tab or space becomes "_"), which turns a made-up name such as
-	 * "utm<tab>source" into the real "utm_source" and lets it use the clean cache.
-	 * Splitting the string leaves names untouched, so anything not exactly on a
-	 * list stays unknown and the page is not cached. Only values are decoded.
-	 *
-	 * @param string $url Current URL.
-	 *
-	 * @return array
-	 */
 	public function extract_query_strings( $url = '' ) {
 		if ( empty( trim( $url ) ) ) {
 			$url = $_SERVER['REQUEST_URI'];
 		}
 
-		$url                 = explode( '?', (string) $url, 2 );
-		$current_url_query   = isset( $url[1] ) ? explode( '#', $url[1], 2 )[0] : '';
-		$breeze_query_output = array();
+		$current_url_query = parse_url( $url, PHP_URL_QUERY );
 
-		foreach ( explode( '&', $current_url_query ) as $query_pair ) {
-			$query_pair = explode( '=', $query_pair, 2 );
+		if ( ! empty( $current_url_query ) ) {
+		parse_str( $current_url_query, $breeze_query_output );
+		}
 
-			if ( '' !== $query_pair[0] ) {
-				$breeze_query_output[ $query_pair[0] ] = isset( $query_pair[1] ) ? rawurldecode( $query_pair[1] ) : '';
-			}
+		if ( empty( $breeze_query_output ) ) {
+			$breeze_query_output = array();
 		}
 
 		return $breeze_query_output;
@@ -393,10 +305,11 @@ class Breeze_Query_Strings_Rules {
 		);
 
 		// Only process links if the request is GET.
-		if ( ( isset( $_SERVER['REQUEST_METHOD'] ) && 'GET' !== $_SERVER['REQUEST_METHOD'] ) || empty( $current_url ) ) {
+		if ( 'GET' !== $_SERVER['REQUEST_METHOD'] || empty( $current_url ) ) {
 			return $found_items;
 		}
 
+		$ignored_query_vars      = $this->fetch_ignored_list();
 		$to_cache_query_vars     = $this->fetch_always_cache_list();
 		$user_defined_query_vars = array();
 
@@ -404,6 +317,7 @@ class Breeze_Query_Strings_Rules {
 		$extracted_vars = $this->extract_query_strings( $current_url );
 		// Query strings that are not found anywhere.
 		$not_found_anywhere = $extracted_vars;
+
 
 		if (
 			isset( $GLOBALS['breeze_config'], $GLOBALS['breeze_config']['cached-query-strings'] ) &&
@@ -420,10 +334,12 @@ class Breeze_Query_Strings_Rules {
 			}
 		}
 
+
 		foreach ( $extracted_vars as $index => $value ) {
+			$index = mb_strtolower( trim( $index ) );
 
 			// Fetch all the query vars that are in the ignore list and found in current URL.
-			if ( $this->is_ignored_query_var( $index ) ) {
+			if ( in_array( $index, $ignored_query_vars, true ) ) {
 				$found_items['ignored_no'] ++;
 				$found_items['ignored_items'][ $index ] = $value;
 				unset( $not_found_anywhere[ $index ] );
@@ -437,14 +353,11 @@ class Breeze_Query_Strings_Rules {
 			}
 
 			// Fetch all the query vars that are in the must cache list and found in current URL, user defined.
-			// if ( 
-			// 	in_array( $index, $user_defined_query_vars, true ) 
-			// 	|| ! empty( breeze_is_string_in_array_values( $index, $user_defined_query_vars ) )
-			// ) {
-			// 	$found_items['user_cached_no'] ++;
-			// 	$found_items['user_cached_items'][ $index ] = $value;
-			// 	unset( $not_found_anywhere[ $index ] );
-			// }
+			if ( in_array( $index, $user_defined_query_vars, true ) ) {
+				$found_items['user_cached_no'] ++;
+				$found_items['user_cached_items'][ $index ] = $value;
+				unset( $not_found_anywhere[ $index ] );
+			}
 		}
 
 		$found_items['extra_query_no']   = count( $not_found_anywhere );

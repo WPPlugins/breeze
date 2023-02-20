@@ -70,8 +70,7 @@ if ( ! class_exists( 'Breeze_Prefetch' ) ) {
 				};
 				$exclude_urls = array_map( $clear_star, $exclude_urls );
 			}
-			$exclude_urls[] = 'wp-admin';
-			$exclude_urls[] = 'wp-login.php';
+			$exclude_urls[] = '/wp-admin/';
 
 			return $exclude_urls;
 		}

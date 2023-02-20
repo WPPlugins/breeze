@@ -57,7 +57,7 @@ OLD checkbox
       width: 97.5%;
       font-size: 0.91em;
     }
-  } 
+  }
 
   input.br-box {
     display: none;
@@ -272,10 +272,6 @@ New checkbox 2
   user-select: none;
 }
 
-.breeze_disable_cursor {
-  cursor: default;
-}
-
 .br-switcher input {
   display: none;
 }
@@ -435,24 +431,6 @@ Radio button graphic.
 }
 .br-radio input[type=radio] + .radio-label:empty:before {
   margin-right: 0;
-}
-
-#refresh-api-token {
-  cursor: pointer;
-}
-#refresh-api-token .dashicons {
-  font-size: 30px;
-  padding-top: 5px;
-  color: #11ACDF;
-}
-
-#breeze-api-token {
-  width: 301px;
-}
-@media only screen and (max-width: 480px) {
-  #breeze-api-token {
-    width: 80%;
-  }
 }
 
 .br-loader-spinner {
@@ -898,52 +876,6 @@ body {
 }
 .breeze-box .br-options section .br-option-item .br-note-no-margin {
   margin-top: 0;
-}
-.breeze-box .br-options section .br-option-item .br-doublecheck-color-control {
-  width: 100%;
-  display: -webkit-inline-box;
-  display: -moz-inline-box;
-  display: -webkit-inline-flex;
-  display: -ms-inline-flexbox;
-  display: inline-flex;
-  -webkit-box-direction: normal;
-  -webkit-box-orient: horizontal;
-  -moz-box-direction: normal;
-  -moz-box-orient: horizontal;
-  -webkit-flex-direction: row;
-  -ms-flex-direction: row;
-  flex-direction: row;
-  -webkit-box-align: center;
-  -moz-box-align: center;
-  -ms-flex-align: center;
-  -webkit-align-items: center;
-  align-items: center;
-  gap: 10px;
-}
-.breeze-box .br-options section .br-option-item .br-doublecheck-color-control .br-doublecheck-color-picker {
-  width: 44px;
-  min-width: 44px;
-  height: 32px;
-  padding: 2px;
-  border: 1px solid #D8D8D8;
-  border-radius: 4px;
-  background-color: #FFFFFF;
-  cursor: pointer;
-}
-.breeze-box .br-options section .br-option-item .br-doublecheck-color-control .br-doublecheck-color-code {
-  max-width: 180px;
-  width: 100%;
-  height: 32px;
-  border: 1px solid #D8D8D8;
-  border-radius: 4px;
-  padding: 0 10px;
-  font-family: monospace;
-  text-transform: uppercase;
-}
-@media only screen and (max-width: 900px) {
-  .breeze-box .br-options section .br-option-item .br-doublecheck-color-control .br-doublecheck-color-code {
-    max-width: 100%;
-  }
 }
 .breeze-box .br-options section .br-option-item p:not(.br-important) {
   color: #42526E;
@@ -1517,16 +1449,4 @@ span.br-important {
   100% {
     transform: rotate(360deg);
   }
-}
-.br-rollback-option {
-  gap: 5px;
-}
-.br-rollback-option .breeze-version {
-  max-width: 170px;
-}
-
-#breeze_rollback_form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }

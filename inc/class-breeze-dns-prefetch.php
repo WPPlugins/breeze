@@ -53,11 +53,7 @@ class Breeze_DNS_Prefetch {
 	 * @access public
 	 */
 	private function clean_schema( $current_url ) {
-		// Strip the URL scheme (http://, https://, or protocol-relative //) as a substring.
-		// Note: ltrim() must NOT be used here because its second argument is a character
-		// mask, which would incorrectly strip leading h/t/p/s/: characters from domains
-		// such as "tracking.example.net" (it would become "racking.example.net").
-		return preg_replace( '#^(?:https?:)?//#i', '', (string) $current_url );
+		return ltrim( $current_url, 'https:' );
 	}
 }
 
