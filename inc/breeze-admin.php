@@ -274,6 +274,13 @@ class Breeze_Admin {
 		} else {
 			$current_screen_url = admin_url( basename( $_SERVER['REQUEST_URI'] ) );
 		}
+
+		if(true === $is_network){
+			$current_screen_url = network_admin_url( basename( $_SERVER['REQUEST_URI'] ) );
+			// particular fix when network is found twice in the url.
+			$current_screen_url = str_replace('network/network','network/',$current_screen_url);
+		}
+
 		$current_screen_url = remove_query_arg( array(
 			'breeze_purge',
 			'_wpnonce',
@@ -406,7 +413,6 @@ class Breeze_Admin {
 	 */
 	public static function plugin_active_hook( $network_wide ) {
 		WP_Filesystem();
-
 		// Default basic
 		$basic = breeze_get_option( 'basic_settings' );
 		if ( empty( $basic ) ) {
@@ -993,7 +999,6 @@ class Breeze_Admin {
 				delete_site_option( 'breeze_ecommerce_detect' );
 				delete_site_option( 'breeze_exclude_url_pages' );
 				delete_site_option( 'breeze_hide_notice' );
-				delete_site_option( 'breeze_version' );
 
 				// Delete options for each sub-blog.
 				foreach ( $sites as $blog_id ) {

@@ -229,6 +229,10 @@ function breeze_cache( $buffer, $flags ) {
 	if ( is_404() || is_search() || post_password_required() ) {
 		return $buffer;
 	}
+
+	// Filter to modify cache buffer before caching
+	$buffer = apply_filters('breeze_cache_buffer_before_processing', $buffer);
+
 	global $wp_filesystem, $breeze_current_url_path;
 	if ( empty( $wp_filesystem ) ) {
 		require_once( ABSPATH . '/wp-admin/includes/file.php' );
@@ -306,6 +310,10 @@ function breeze_cache( $buffer, $flags ) {
 			'headers' => $headers,
 		)
 	);
+
+
+	// Filter to modify cache buffer after caching
+	$buffer = apply_filters('breeze_cache_buffer_after_processing', $buffer);
 
 	//cache per users
 	if ( is_user_logged_in() ) {

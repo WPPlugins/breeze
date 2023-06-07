@@ -112,7 +112,7 @@ class Breeze_Lazy_Load {
 		if ( ! empty( $img_matches[0] ) ) {
 
 			// Check if required native ll
-			if ( true === $use_native ) {
+				if ( true === $use_native ) {
 
 				foreach ( $img_matches[0] as $img_match ) {
 
@@ -123,8 +123,8 @@ class Breeze_Lazy_Load {
 						// Rewriting the old string in content
 						$content = str_replace( $img_match, $img_match_new, $content );
 					}
-				}
-			} else {
+					}
+				} else {
 
 				// Non-native behavior
 				foreach ( $img_matches[0] as $img_match ) {
@@ -143,12 +143,10 @@ class Breeze_Lazy_Load {
 							continue;
 						}
 					}
-
 					// Get the image URL
 					preg_match( '/src=(?:"|\')(.+?)(?:"|\')/', $img_match, $src_value );
 					$current_src = ! empty( $src_value[1] ) ? $src_value[1] : '';
 					if ( true !== $this->excluded_images( $current_src ) ) {
-
 						// Add lazy-load data attribute.
 						$img_match_new = preg_replace( '/(<img\s+)/', '$1data-breeze="' . $current_src . '" ', $img_match );
 
@@ -202,24 +200,25 @@ class Breeze_Lazy_Load {
 			}
 		}
 
+
 		$apply_to_iframes = Breeze_Options_Reader::get_option_value( 'breeze-lazy-load-iframes' );
 		$apply_to_iframes = apply_filters( 'breeze_enable_lazy_load_iframes', $apply_to_iframes );
 
 		if ( true === filter_var( $apply_to_iframes, FILTER_VALIDATE_BOOLEAN ) ) {
-			$allowed_iframes_url = apply_filters( 'breeze_iframe_lazy_load_list', array(
-				'youtube.com',
-				'dailymotion.com/embed/video',
-				'facebook.com/plugins/video.php',
-				'player.vimeo.com',
-				'fast.wistia.net/embed/',
-				'players.brightcove.net',
-				's3.amazonaws.com',
-				'cincopa.com/media',
-				'twitch.tv',
-				'bitchute.com',
-				'media.myspace.com/play/video',
-				'tiktok.com/embed',
-			) );
+				$allowed_iframes_url = apply_filters( 'breeze_iframe_lazy_load_list', array(
+					'youtube.com',
+					'dailymotion.com/embed/video',
+					'facebook.com/plugins/video.php',
+					'player.vimeo.com',
+					'fast.wistia.net/embed/',
+					'players.brightcove.net',
+					's3.amazonaws.com',
+					'cincopa.com/media',
+					'twitch.tv',
+					'bitchute.com',
+					'media.myspace.com/play/video',
+					'tiktok.com/embed',
+				) );
 
 			// Match and process iframes.
 			preg_match_all( '/<iframe.*<\/iframe>/isU', $content, $iframe_matches );
@@ -260,7 +259,7 @@ class Breeze_Lazy_Load {
 				$video_tag_new   = preg_replace( '/src=\"([^\"]+)\"/isU', '', $video_tag_new );
 				$content         = str_replace( $video_tag, $video_tag_new, $content );
 			}
-		}
+					}
 
 
 		return $content;
@@ -282,7 +281,7 @@ class Breeze_Lazy_Load {
 		if ( empty( trim( $current_classes ) ) ) {
 			$current_classes = 'br-lazy';
 		} else {
-			$current_classes .= ' br-lazy';
+					$current_classes .= 'br-lazy';
 		}
 
 		return $current_classes;
