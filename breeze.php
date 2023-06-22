@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Breeze
  * Description: Breeze is a WordPress cache plugin with extensive options to speed up your website. All the options including Varnish Cache are compatible with Cloudways hosting.
- * Version: 2.0.25
+ * Version: 2.0.26
  * Text Domain: breeze
  * Domain Path: /languages
  * Author: Cloudways
@@ -37,7 +37,7 @@ if ( ! defined( 'BREEZE_PLUGIN_DIR' ) ) {
 	define( 'BREEZE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 }
 if ( ! defined( 'BREEZE_VERSION' ) ) {
-	define( 'BREEZE_VERSION', '2.0.25' );
+	define( 'BREEZE_VERSION', '2.0.26' );
 }
 if ( ! defined( 'BREEZE_SITEURL' ) ) {
 	define( 'BREEZE_SITEURL', get_site_url() );
@@ -299,7 +299,7 @@ function breeze_after_plugin_update_done( $upgrader_object, $options ) {
 				}
 
 				// Create an event that will execute the newer code
-				wp_schedule_single_event( current_time( 'U' ) + 10, 'breeze_after_update_scheduled_hook', array( $upgrader_object, $options ) );
+				wp_schedule_single_event( current_time( 'U' ) + 10, 'breeze_after_update_scheduled_hook', array( $options ) );
 			}
 		}
 	}
