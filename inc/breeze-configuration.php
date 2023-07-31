@@ -1,6 +1,5 @@
 <?php
 /**
-
  * @copyright 2017  Cloudways  https://www.cloudways.com
  *
  *  This plugin is inspired from WP Speed of Light by JoomUnited.
