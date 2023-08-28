@@ -1963,7 +1963,7 @@ class Breeze_Configuration {
 		// Preload default
 		$default_preload = array(
 			'breeze-preload-fonts' => array(),
-			'breeze-preload-links' => '0',
+			'breeze-preload-links' => '1',
 			'breeze-prefetch-urls' => array(),
 		);
 		$preload         = $default_preload;

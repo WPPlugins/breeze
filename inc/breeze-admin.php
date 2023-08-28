@@ -560,7 +560,7 @@ class Breeze_Admin {
 		}
 		$default_preload = array(
 			'breeze-preload-fonts' => array(),
-			'breeze-preload-links' => '0',
+			'breeze-preload-links' => '1',
 			'breeze-prefetch-urls' => array(),
 		);
 		$preload         = array_merge( $default_preload, $preload );
@@ -870,7 +870,7 @@ class Breeze_Admin {
 		// Preload default
 		$default_preload = array(
 			'breeze-preload-fonts' => array(),
-			'breeze-preload-links' => '0',
+			'breeze-preload-links' => '1',
 			'breeze-prefetch-urls' => array(),
 		);
 		$preload         = $default_preload;
