@@ -721,7 +721,7 @@ function breeze_all_country_codes() {
  */
 function breeze_mobile_detect_library() {
 	$call_class     = false;
-	$path_to_plugin = ABSPATH . 'wp-content/plugins/breeze/';
+	$path_to_plugin = dirname( __FILE__, 2 ) . '/';
 
 	if ( ! class_exists( '\Detection\MobileDetect' ) ) {
 		if ( version_compare( PHP_VERSION, '7.3.0' ) >= 0 && version_compare( PHP_VERSION, '8.0.0', '<' ) ) {
