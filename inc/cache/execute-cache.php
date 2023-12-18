@@ -63,8 +63,7 @@ if ( isset( $GLOBALS['breeze_config'], $GLOBALS['breeze_config']['disable_per_ad
 require_once dirname( __DIR__ ) . '/class-breeze-lazy-load.php';
 
 // Include and instantiate the class.
-require_once 'Mobile-Detect-2.8.25/Mobile_Detect.php';
-$detect = new \Cloudways\Breeze\Mobile_Detect\Mobile_Detect;
+$detect = breeze_mobile_detect_library();
 
 // Don't cache robots.txt or htacesss
 if ( strpos( $_SERVER['REQUEST_URI'], 'robots.txt' ) !== false || strpos( $_SERVER['REQUEST_URI'], '.htaccess' ) !== false ) {
@@ -178,17 +177,32 @@ if ( ! $check_exclude ) {
 		//                            M for Mobile cache
 		//                            T for Tablet cache
 		if ( (int) $devices['breeze-mobile-cache'] == 1 ) {
-			$X1       = 'D';
 			$filename .= '_breeze_cache_desktop';
 		}
 		if ( (int) $devices['breeze-mobile-cache'] == 2 ) {
-			$X1       = 'M';
 			$filename .= '_breeze_cache_mobile';
 		}
 	} else {
 		if ( (int) $devices['breeze-desktop-cache'] == 1 ) {
-			$X1       = 'D';
 			$filename .= '_breeze_cache_desktop';
+		}
+	}
+
+	$X1 = 'D';
+
+	if ( true === is_breeze_mobile_cache() ) {
+		if ( true === breeze_is_cloudways_server() ) {
+			$X1 = breeze_cache_type_return();
+		} else {
+			if ( $detect->isMobile() ) {
+				if ( ! $detect->isTablet() ) {
+					$X1 = 'M';
+				} else {
+					$X1 = 'T';
+				}
+			} else {
+				$X1 = 'D';
+			}
 		}
 	}
 
@@ -214,8 +228,7 @@ function breeze_cache( $buffer, $flags ) {
 		return $buffer;
 	}
 
-	require_once 'Mobile-Detect-2.8.25/Mobile_Detect.php';
-	$detect = new \Cloudways\Breeze\Mobile_Detect\Mobile_Detect;
+	$detect = breeze_mobile_detect_library();
 	//not cache per administrator if option disable optimization for admin users clicked
 	if ( true === $breeze_user_logged && false === $breeze_use_cache_system ) {
 		return $buffer;
@@ -293,10 +306,33 @@ function breeze_cache( $buffer, $flags ) {
 		$buffer = preg_replace_callback( $pattern, 'breeze_cc_process_match', $buffer );
 
 	}
-
+	$cache_type = '';
 	if ( preg_match( '#</html>#i', $buffer ) ) {
 
-		$buffer .= "\n<!-- Cache served by breeze CACHE - Last modified: " . gmdate( 'D, d M Y H:i:s', $modified_time ) . " GMT -->\n";
+		if ( true === is_breeze_mobile_cache() ) {
+			if ( true === breeze_is_cloudways_server() ) {
+				$cache_type_cloudways = breeze_cache_type_return();
+				if ( 'D' === $cache_type_cloudways ) {
+					$cache_type = ' (Desktop)';
+				} elseif ( 'T' === $cache_type_cloudways ) {
+					$cache_type = ' (Tablet)';
+				} elseif ( 'M' === $cache_type_cloudways ) {
+					$cache_type = ' (Mobile)';
+				}
+			} else {
+				if ( $detect->isMobile() ) {
+					if ( ! $detect->isTablet() ) {
+						$cache_type = ' (Mobile)';
+					} else {
+						$cache_type = ' (Tablet)';
+					}
+				} else {
+					$cache_type = ' (Desktop)';
+				}
+			}
+		}
+
+		$buffer .= "\n<!-- Cache served by breeze CACHE{$cache_type} - Last modified: " . gmdate( 'D, d M Y H:i:s', $modified_time ) . " GMT -->\n";
 	}
 
 	$headers = array(
@@ -354,17 +390,30 @@ function breeze_cache( $buffer, $flags ) {
 	// Detect devices
 	if ( $detect->isMobile() && ! $detect->isTablet() ) {
 		if ( $devices['breeze-mobile-cache'] == 1 ) {
-			$X1                      = 'D';
 			$breeze_current_url_path .= '_breeze_cache_desktop';
 		}
 		if ( $devices['breeze-mobile-cache'] == 2 ) {
-			$X1                      = 'M';
 			$breeze_current_url_path .= '_breeze_cache_mobile';
 		}
 	} else {
 		if ( $devices['breeze-desktop-cache'] == 1 ) {
-			$X1                      = 'D';
 			$breeze_current_url_path .= '_breeze_cache_desktop';
+		}
+	}
+	$X1 = 'D';
+	if(true === is_breeze_mobile_cache()){
+		if(true === breeze_is_cloudways_server()){
+			$X1 = breeze_cache_type_return();
+		}else{
+			if ( $detect->isMobile() ) {
+				if ( ! $detect->isTablet() ) {
+					$X1 = 'M';
+				} else {
+					$X1 = 'T';
+				}
+			} else {
+				$X1 = 'D';
+			}
 		}
 	}
 
@@ -373,12 +422,12 @@ function breeze_cache( $buffer, $flags ) {
 	if ( strpos( $breeze_current_url_path, '_breeze_cache_' ) !== false ) {
 		if ( ! empty( $GLOBALS['breeze_config']['cache_options']['breeze-gzip-compression'] ) && function_exists( 'gzencode' ) ) {
 
-			$wp_filesystem->put_contents( $path . md5( $breeze_current_url_path . '/index.gzip.html' ) . $is_suffix . '.php', $data );
-			$wp_filesystem->touch( $path . md5( $breeze_current_url_path . '/index.gzip.html' ) . $is_suffix . '.php', $modified_time );
+			$wp_filesystem->put_contents( $path . breeze_mobile_detect() . md5( $breeze_current_url_path . '/index.gzip.html' ) . $is_suffix . '.php', $data );
+			$wp_filesystem->touch( $path . breeze_mobile_detect() . md5( $breeze_current_url_path . '/index.gzip.html' ) . $is_suffix . '.php', $modified_time );
 		} else {
 
-			$wp_filesystem->put_contents( $path . md5( $breeze_current_url_path . '/index.html' ) . $is_suffix . '.php', $data );
-			$wp_filesystem->touch( $path . md5( $breeze_current_url_path . '/index.html' ) . $is_suffix . '.php', $modified_time );
+			$wp_filesystem->put_contents( $path . breeze_mobile_detect() . md5( $breeze_current_url_path . '/index.html' ) . $is_suffix . '.php', $data );
+			$wp_filesystem->touch( $path . breeze_mobile_detect() . md5( $breeze_current_url_path . '/index.html' ) . $is_suffix . '.php', $modified_time );
 		}
 	} else {
 		return $buffer;
@@ -447,8 +496,7 @@ function breeze_serve_cache( $filename, $breeze_current_url_path, $X1, $opts ) {
 
 
 	$blog_id_requested = isset( $GLOBALS['breeze_config']['blog_id'] ) ? $GLOBALS['breeze_config']['blog_id'] : 0;
-	$path              = breeze_get_cache_base_path( false, $blog_id_requested ) . md5( $breeze_current_url_path ) . '/' . $file_name;
-
+	$path              = breeze_get_cache_base_path( false, $blog_id_requested ) . md5( $breeze_current_url_path ) . '/' . breeze_mobile_detect() . $file_name;
 
 	if ( @file_exists( $path ) ) {
 
