@@ -829,7 +829,8 @@ function breeze_is_cloudways_server() {
 
 	if (
 		false !== strpos( $_SERVER['DOCUMENT_ROOT'], 'cloudwaysapps' ) ||
-		false !== strpos( $_SERVER['DOCUMENT_ROOT'], 'cloudwaysstagingapps' )
+		false !== strpos( $_SERVER['DOCUMENT_ROOT'], 'cloudwaysstagingapps' ) ||
+		! empty( getenv( 'FPC_ENV' ) )
 	) {
 		return true;
 	}
