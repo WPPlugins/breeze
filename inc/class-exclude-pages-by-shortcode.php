@@ -83,7 +83,11 @@ class Exclude_Pages_By_Shortcode {
 
 		if ( true === $action_taken ) {
 			// reset the config file.
-			$wp_filesystem = breeze_get_filesystem();
+			global $wp_filesystem;
+			if ( empty( $wp_filesystem ) ) {
+				require_once( ABSPATH . '/wp-admin/includes/file.php' );
+				WP_Filesystem();
+			}
 
 			// import these file in front-end when required.
 			if ( ! class_exists( 'Breeze_Ecommerce_Cache' ) ) {

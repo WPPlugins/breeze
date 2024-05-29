@@ -1,12 +1,10 @@
 <?php
+
 /**
  * Class that handles the export and import of Breeze options
  *
  * Class Breeze_Settings_Import_Export
  */
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
 class Breeze_Settings_Import_Export {
 
 	function __construct() {
@@ -14,11 +12,11 @@ class Breeze_Settings_Import_Export {
 		// Logged in users only action.
 		add_action( 'wp_ajax_breeze_export_json', array( &$this, 'export_json_settings' ) );
 		add_action( 'wp_ajax_breeze_import_json', array( &$this, 'import_json_settings' ) );
+
 	}
 
 	/**
 	 * Import settings using interface in back-end.
-	 *
 	 * @since 1.2.2
 	 * @access public
 	 */
@@ -58,36 +56,6 @@ class Breeze_Settings_Import_Export {
 					$level = '';
 					if ( is_multisite() ) {
 						$level = ( isset( $_POST['network_level'] ) ) ? trim( $_POST['network_level'] ) : '';
-
-						// Map `network_level` to a scope the current user can act on:
-						//   - 'network'             -> Super Admins only
-						//   - numeric (other blog)  -> Super Admins, or the own
-						//                              blog id for site administrators
-						//   - anything else         -> the current site
-						$current_blog_id = (int) get_current_blog_id();
-						if ( 'network' === $level ) {
-							if ( ! breeze_user_can_manage_network() ) {
-								wp_send_json_error(
-									new WP_Error(
-										'authority_issue',
-										__( 'Only Network (Super) Administrators can import settings at the network level.', 'breeze' )
-									)
-								);
-							}
-						} elseif ( is_numeric( $level ) ) {
-							$target_blog_id = (int) $level;
-							if ( $target_blog_id !== $current_blog_id && ! breeze_user_can_manage_network() ) {
-								wp_send_json_error(
-									new WP_Error(
-										'authority_issue',
-										__( 'You can only import settings for the site you administer.', 'breeze' )
-									)
-								);
-							}
-							$level = (string) $target_blog_id;
-						} else {
-							$level = '';
-						}
 					}
 					if ( ! isset( $json['breeze_file_settings'] ) && ! isset( $json['breeze_preload_settings'] ) ) {
 						$action = self::replace_options_old_to_new( $json, $level );
@@ -112,6 +80,7 @@ class Breeze_Settings_Import_Export {
 		} else {
 			wp_send_json_error( new WP_Error( 'file_not_set', __( 'The JSON file is missing', 'breeze' ) ) );
 		}
+
 	}
 
 	/**
@@ -121,37 +90,10 @@ class Breeze_Settings_Import_Export {
 	 * @access public
 	 */
 	public function export_json_settings() {
-		check_ajax_referer( '_breeze_export_json', 'security' );
 		breeze_is_restricted_access();
 		$level = '';
 		if ( is_multisite() ) {
-			$level = ( isset( $_GET['network_level'] ) ) ? trim( wp_unslash( $_GET['network_level'] ) ) : '';
-
-			// Network-level and cross-site exports are limited to Super Admins.
-			$current_blog_id = (int) get_current_blog_id();
-			if ( 'network' === $level ) {
-				if ( ! breeze_user_can_manage_network() ) {
-					wp_send_json_error(
-						new WP_Error(
-							'authority_issue',
-							__( 'Only Network (Super) Administrators can export settings at the network level.', 'breeze' )
-						)
-					);
-				}
-			} elseif ( is_numeric( $level ) ) {
-				$target_blog_id = (int) $level;
-				if ( $target_blog_id !== $current_blog_id && ! breeze_user_can_manage_network() ) {
-					wp_send_json_error(
-						new WP_Error(
-							'authority_issue',
-							__( 'You can only export settings for the site you administer.', 'breeze' )
-						)
-					);
-				}
-				$level = (string) $target_blog_id;
-			} else {
-				$level = '';
-			}
+			$level = ( isset( $_GET['network_level'] ) ) ? $_GET['network_level'] : '';
 		}
 		$response = self::read_options( $level );
 
@@ -159,6 +101,7 @@ class Breeze_Settings_Import_Export {
 		header( 'Content-type: application/json' );
 
 		wp_send_json( $response );
+
 	}
 
 	/**
@@ -251,7 +194,7 @@ class Breeze_Settings_Import_Export {
 	/**
 	 * Import settings using interface in back-end.
 	 *
-	 * @param array  $options The array with options from import action.
+	 * @param array $options The array with options from import action.
 	 * @param string $level empty for single site, network for root multisite, numeric for subside ID.
 	 *
 	 * @return bool|string
@@ -270,19 +213,7 @@ class Breeze_Settings_Import_Export {
 			// If this export is made from network admin
 			if ( 'network' === $level ) {
 				foreach ( $options as $meta_key => $meta_value ) {
-					$meta_value = self::validate_option_group( $meta_value, $meta_key );
-
 					if ( false !== strpos( $meta_key, 'breeze_' ) ) {
-						if ( 'breeze_cdn_integration' === $meta_key ) {
-							$meta_value = $this->breeze_sanitize_imported_settings( $meta_value );
-						}
-						if ( 'breeze_advanced_settings' === $meta_key && is_array( $meta_value ) ) {
-							$current_advanced               = get_site_option( 'breeze_advanced_settings' );
-							$meta_value['breeze-api-token'] = self::sanitize_imported_api_token(
-								isset( $meta_value['breeze-api-token'] ) ? $meta_value['breeze-api-token'] : '',
-								is_array( $current_advanced ) ? $current_advanced : array()
-							);
-						}
 						update_site_option( $meta_key, $meta_value );
 					} else {
 						// $meta_key was not imported
@@ -295,19 +226,8 @@ class Breeze_Settings_Import_Export {
 
 				$blog_id = absint( $level );
 				foreach ( $options as $meta_key => $meta_value ) {
-					$meta_value = self::validate_option_group( $meta_value, $meta_key );
 
 					if ( false !== strpos( $meta_key, 'breeze_' ) ) {
-						if ( 'breeze_cdn_integration' === $meta_key ) {
-							$meta_value = $this->breeze_sanitize_imported_settings( $meta_value );
-						}
-						if ( 'breeze_advanced_settings' === $meta_key && is_array( $meta_value ) ) {
-							$current_advanced               = get_blog_option( $blog_id, 'breeze_advanced_settings' );
-							$meta_value['breeze-api-token'] = self::sanitize_imported_api_token(
-								isset( $meta_value['breeze-api-token'] ) ? $meta_value['breeze-api-token'] : '',
-								is_array( $current_advanced ) ? $current_advanced : array()
-							);
-						}
 						update_blog_option( $blog_id, $meta_key, $meta_value );
 					} else {
 						// $meta_key was not imported
@@ -320,19 +240,7 @@ class Breeze_Settings_Import_Export {
 		} else {
 
 			foreach ( $options as $meta_key => $meta_value ) {
-				$meta_value = self::validate_option_group( $meta_value, $meta_key );
-
 				if ( false !== strpos( $meta_key, 'breeze_' ) ) {
-					if ( 'breeze_cdn_integration' === $meta_key ) {
-						$meta_value = $this->breeze_sanitize_imported_settings( $meta_value );
-					}
-					if ( 'breeze_advanced_settings' === $meta_key && is_array( $meta_value ) ) {
-						$current_advanced               = get_option( 'breeze_advanced_settings' );
-						$meta_value['breeze-api-token'] = self::sanitize_imported_api_token(
-							isset( $meta_value['breeze-api-token'] ) ? $meta_value['breeze-api-token'] : '',
-							is_array( $current_advanced ) ? $current_advanced : array()
-						);
-					}
 					update_option( $meta_key, $meta_value );
 				} else {
 					// $meta_key was not imported
@@ -351,25 +259,10 @@ class Breeze_Settings_Import_Export {
 		return true;
 	}
 
-	public function breeze_sanitize_imported_settings( $settings ) {
-
-		foreach ( $settings as $name => $value ) {
-			if ( is_array( $value ) ) {
-				// If the value is an array, recursively sanitize it.
-				$settings[ $name ] = $this->breeze_sanitize_imported_settings( $value );
-			} else {
-				// If the value is not an array, sanitize the value.
-				$settings[ $name ] = sanitize_text_field( $value );
-			}
-		}
-
-		return $settings;
-	}
-
 	/**
 	 * Import settings using WP-CLI in terminal.
 	 *
-	 * @param array  $options The array with options from import action.
+	 * @param array $options The array with options from import action.
 	 * @param string $level empty for single site, network for root multisite, numeric for subside ID.
 	 *
 	 * @return bool|string
@@ -393,14 +286,6 @@ class Breeze_Settings_Import_Export {
 
 					// Validate options.
 					$meta_value = self::validate_option_group( $meta_value, $meta_key );
-
-					if ( 'breeze_advanced_settings' === $meta_key && is_array( $meta_value ) ) {
-						$current_advanced               = get_site_option( 'breeze_advanced_settings' );
-						$meta_value['breeze-api-token'] = self::sanitize_imported_api_token(
-							isset( $meta_value['breeze-api-token'] ) ? $meta_value['breeze-api-token'] : '',
-							is_array( $current_advanced ) ? $current_advanced : array()
-						);
-					}
 
 					if ( false !== strpos( $meta_key, 'breeze_' ) ) {
 						update_site_option( $meta_key, $meta_value );
@@ -427,14 +312,6 @@ class Breeze_Settings_Import_Export {
 					// Validate options.
 					$meta_value = self::validate_option_group( $meta_value, $meta_key );
 
-					if ( 'breeze_advanced_settings' === $meta_key && is_array( $meta_value ) ) {
-						$current_advanced               = get_blog_option( $blog_id, 'breeze_advanced_settings' );
-						$meta_value['breeze-api-token'] = self::sanitize_imported_api_token(
-							isset( $meta_value['breeze-api-token'] ) ? $meta_value['breeze-api-token'] : '',
-							is_array( $current_advanced ) ? $current_advanced : array()
-						);
-					}
-
 					if ( false !== strpos( $meta_key, 'breeze_' ) ) {
 						self::ttl_exception( $meta_key, $meta_value );
 						update_blog_option( $blog_id, $meta_key, $meta_value );
@@ -454,14 +331,6 @@ class Breeze_Settings_Import_Export {
 
 				// Validate options.
 				$meta_value = self::validate_option_group( $meta_value, $meta_key );
-
-				if ( 'breeze_advanced_settings' === $meta_key && is_array( $meta_value ) ) {
-					$current_advanced               = get_option( 'breeze_advanced_settings' );
-					$meta_value['breeze-api-token'] = self::sanitize_imported_api_token(
-						isset( $meta_value['breeze-api-token'] ) ? $meta_value['breeze-api-token'] : '',
-						is_array( $current_advanced ) ? $current_advanced : array()
-					);
-				}
 
 				if ( false !== strpos( $meta_key, 'breeze_' ) ) {
 					update_option( $meta_key, $meta_value );
@@ -493,9 +362,9 @@ class Breeze_Settings_Import_Export {
 	 * Import settings using interface in back-end.
 	 * Migrate old settings to the new format created in v2.0.0.
 	 *
-	 * @param array  $options_imported The array with options from import action.
+	 * @param array $options_imported The array with options from import action.
 	 * @param string $level empty for single site, network for root multisite, numeric for subside ID.
-	 * @param bool   $show_cli_messages Display CLI messages in the terminal when using import by WP-CLI.
+	 * @param bool $show_cli_messages Display CLI messages in the terminal when using import by WP-CLI.
 	 *
 	 * @return bool
 	 *
@@ -514,18 +383,7 @@ class Breeze_Settings_Import_Export {
 
 		foreach ( $options_imported as $option_name => $option_values ) {
 			if ( ! is_null( $option_values ) ) {
-				$is_array_valued_option = in_array(
-					$option_name,
-					array(
-						'breeze-doublecheck-elements',
-						'breeze-doublecheck-exclude-url',
-					),
-					true
-				);
-
-				// Keep selector/URL lists intact; flattening would validate each
-				// line as a separate option name (0, 1, …) and skip sanitizing.
-				if ( is_array( $option_values ) && ! $is_array_valued_option ) {
+				if ( is_array( $option_values ) ) {
 					foreach ( $option_values as $val_key => $val_value ) {
 						$options[ $val_key ] = self::validate_json_entry( $val_value, $val_key );
 					}
@@ -551,28 +409,15 @@ class Breeze_Settings_Import_Export {
 				'breeze-ttl'              => ( isset( $options['breeze-ttl'] ) ? $options['breeze-ttl'] : 1440 ),
 			);
 
-			$dc_elems_data  = breeze_sanitize_doublecheck_selectors(
-				isset( $options['breeze-doublecheck-elements'] ) ? $options['breeze-doublecheck-elements'] : array()
-			);
-			$dc_elems       = $dc_elems_data['selectors'];
-			$dc_exclude_url = ( isset( $options['breeze-doublecheck-exclude-url'] ) ? $options['breeze-doublecheck-exclude-url'] : array() );
-
 			$is_minification_js        = ( isset( $options['breeze-minify-js'] ) ? $options['breeze-minify-js'] : '0' );
 			$is_inline_minification_js = ( isset( $options['breeze-include-inline-js'] ) ? $options['breeze-include-inline-js'] : '0' );
 			$is_group_js               = ( isset( $options['breeze-group-js'] ) ? $options['breeze-group-js'] : '0' );
 
 			if ( 0 === absint( $is_minification_js ) || 0 === absint( $is_inline_minification_js ) ) {
-				// $is_group_js = '0';
+				//	$is_group_js = '0';
 			}
 
 			$file = array(
-				'breeze-enable-html-cache'               => ( isset( $options['breeze-enable-html-cache'] ) ? $options['breeze-enable-html-cache'] : '1' ),
-				'breeze-html-doublecheck'                => ( isset( $options['breeze-html-doublecheck'] ) ? $options['breeze-html-doublecheck'] : '0' ),
-				'breeze-doublecheck-elements'            => $dc_elems,
-				'breeze-doublecheck-load'                => ( isset( $options['breeze-doublecheck-load'] ) ? $options['breeze-doublecheck-load'] : 'async' ),
-				'breeze-html-doublecheck-loader'         => ( isset( $options['breeze-html-doublecheck-loader'] ) ? $options['breeze-html-doublecheck-loader'] : '0' ),
-				'breeze-html-doublecheck-loader-overlay' => ( isset( $options['breeze-html-doublecheck-loader-overlay'] ) ? $options['breeze-html-doublecheck-loader-overlay'] : '' ),
-				'breeze-doublecheck-exclude'             => $dc_exclude_url,
 				'breeze-minify-html'        => ( isset( $options['breeze-minify-html'] ) ? $options['breeze-minify-html'] : '0' ),
 				// --
 				'breeze-minify-css'         => ( isset( $options['breeze-minify-css'] ) ? $options['breeze-minify-css'] : '0' ),
@@ -597,7 +442,6 @@ class Breeze_Settings_Import_Export {
 			$preload = array(
 				'breeze-preload-fonts' => ( isset( $options['breeze-preload-fonts'] ) ? $options['breeze-preload-fonts'] : array() ),
 				'breeze-preload-links' => ( isset( $options['breeze-preload-links'] ) ? $options['breeze-preload-links'] : '1' ),
-				'breeze-cache-warmup-enabled' => ( isset( $options['breeze-cache-warmup-enabled'] ) ? $options['breeze-cache-warmup-enabled'] : '0' ),
 			);
 
 			$advanced = array(
@@ -605,8 +449,11 @@ class Breeze_Settings_Import_Export {
 				'cached-query-strings'                 => ( isset( $options['cached-query-strings'] ) ? $options['cached-query-strings'] : array() ),
 				'breeze-wp-emoji'                      => ( isset( $options['breeze-wp-emoji'] ) ? $options['breeze-wp-emoji'] : '0' ),
 				'breeze-store-googlefonts-locally'     => ( isset( $options['breeze-store-googlefonts-locally'] ) ? $options['breeze-store-googlefonts-locally'] : '0' ),
+				'breeze-store-googleanalytics-locally' => ( isset( $options['breeze-store-googleanalytics-locally'] ) ? $options['breeze-store-googleanalytics-locally'] : '0' ),
+				'breeze-store-facebookpixel-locally'   => ( isset( $options['breeze-store-facebookpixel-locally'] ) ? $options['breeze-store-facebookpixel-locally'] : '0' ),
 				'breeze-store-gravatars-locally'       => ( isset( $options['breeze-store-gravatars-locally'] ) ? $options['breeze-store-gravatars-locally'] : '0' ),
 				'breeze-enable-api'                    => ( isset( $options['breeze-enable-api'] ) ? $options['breeze-enable-api'] : '0' ),
+				'breeze-secure-api'                    => ( isset( $options['breeze-secure-api'] ) ? $options['breeze-secure-api'] : '0' ),
 				'breeze-api-token'                     => ( isset( $options['breeze-api-token'] ) ? $options['breeze-api-token'] : '' ),
 
 			);
@@ -650,11 +497,6 @@ class Breeze_Settings_Import_Export {
 						WP_CLI::line( ' breeze_cdn_integration - ' . WP_CLI::colorize( '%Yimported%n' ) );
 						WP_CLI::line( ' breeze_varnish_cache - ' . WP_CLI::colorize( '%Yimported%n' ) );
 					}
-					$current_advanced             = get_site_option( 'breeze_advanced_settings' );
-					$advanced['breeze-api-token'] = self::sanitize_imported_api_token(
-						isset( $advanced['breeze-api-token'] ) ? $advanced['breeze-api-token'] : '',
-						is_array( $current_advanced ) ? $current_advanced : array()
-					);
 					update_site_option( 'breeze_basic_settings', $basic );
 					update_site_option( 'breeze_file_settings', $file );
 					update_site_option( 'breeze_preload_settings', $preload );
@@ -681,11 +523,6 @@ class Breeze_Settings_Import_Export {
 						WP_CLI::line( ' breeze_varnish_cache - ' . WP_CLI::colorize( '%Yimported%n' ) );
 					}
 
-					$current_advanced             = get_blog_option( $blog_id, 'breeze_advanced_settings' );
-					$advanced['breeze-api-token'] = self::sanitize_imported_api_token(
-						isset( $advanced['breeze-api-token'] ) ? $advanced['breeze-api-token'] : '',
-						is_array( $current_advanced ) ? $current_advanced : array()
-					);
 					update_blog_option( $blog_id, 'breeze_basic_settings', $basic );
 					update_blog_option( $blog_id, 'breeze_file_settings', $file );
 					update_blog_option( $blog_id, 'breeze_preload_settings', $preload );
@@ -708,11 +545,6 @@ class Breeze_Settings_Import_Export {
 					WP_CLI::line( ' breeze_cdn_integration - ' . WP_CLI::colorize( '%Yimported%n' ) );
 					WP_CLI::line( ' breeze_varnish_cache - ' . WP_CLI::colorize( '%Yimported%n' ) );
 				}
-				$current_advanced             = get_option( 'breeze_advanced_settings' );
-				$advanced['breeze-api-token'] = self::sanitize_imported_api_token(
-					isset( $advanced['breeze-api-token'] ) ? $advanced['breeze-api-token'] : '',
-					is_array( $current_advanced ) ? $current_advanced : array()
-				);
 				update_option( 'breeze_basic_settings', $basic );
 				update_option( 'breeze_file_settings', $file );
 				update_option( 'breeze_preload_settings', $preload );
@@ -739,8 +571,9 @@ class Breeze_Settings_Import_Export {
 	 * Validates the options making sure there values are
 	 * the correct format for each option.
 	 *
-	 * @param mixed  $value Imported option value.
+	 * @param mixed $value Imported option value.
 	 * @param string $option Breeze option name.
+	 *
 	 *
 	 * @return array|mixed|string|void|null
 	 * @access private
@@ -767,21 +600,6 @@ class Breeze_Settings_Import_Export {
 			} else {
 				return '';
 			}
-		}
-
-		if ( 'breeze-doublecheck-load' === $option ) {
-			$doublecheck_load_options = array(
-				'preload',
-				'onload',
-				'async',
-			);
-			$value                    = (string) $value;
-
-			if ( in_array( $value, $doublecheck_load_options, true ) ) {
-				return $value;
-			}
-
-			return 'async';
 		}
 
 		/**
@@ -820,18 +638,6 @@ class Breeze_Settings_Import_Export {
 			return $value;
 		}
 
-		if ( 'breeze-html-doublecheck-loader-overlay' === $option ) {
-			return self::sanitize_doublecheck_overlay_color( $value );
-		}
-
-		if ( 'breeze-doublecheck-elements' === $option ) {
-			return self::sanitize_doublecheck_elements( $value );
-		}
-
-		if ( 'breeze-doublecheck-exclude-url' === $option ) {
-			return self::sanitize_doublecheck_exclude_urls( $value );
-		}
-
 		if ( 'breeze_first_install' === $option ) {
 			if ( 'no' !== $value && 'yes' !== $value ) {
 				return 'no';
@@ -864,9 +670,6 @@ class Breeze_Settings_Import_Export {
 			'breeze-active'                        => '1',
 			'breeze-mobile-separate'               => '1',
 			'breeze-cross-origin'                  => '0',
-			'breeze-enable-html-cache'             => '1',
-			'breeze-html-doublecheck'              => '0',
-			'breeze-html-doublecheck-loader'       => '0',
 			'breeze-gzip-compression'              => '1',
 			'breeze-browser-cache'                 => '1',
 			'breeze-lazy-load'                     => '0',
@@ -886,9 +689,9 @@ class Breeze_Settings_Import_Export {
 			'breeze-include-inline-js'             => '0',
 			'breeze-enable-js-delay'               => '0',
 			'breeze-preload-links'                 => '1',
-			'breeze-cache-warmup-enabled'          => '0',
 			'breeze-wp-emoji'                      => '0',
 			'breeze-enable-api'                    => '0',
+			'breeze-secure-api'                    => '0',
 			'cdn-active'                           => '0',
 			'cdn-relative-path'                    => '1',
 			'auto-purge-varnish'                   => '1',
@@ -896,6 +699,8 @@ class Breeze_Settings_Import_Export {
 			'breeze-control-heartbeat'             => '0',
 			'breeze-delay-all-js'                  => '0',
 			'breeze-store-googlefonts-locally'     => '0',
+			'breeze-store-googleanalytics-locally' => '0',
+			'breeze-store-facebookpixel-locally'   => '0',
 			'breeze-store-gravatars-locally'       => '0',
 		);
 
@@ -981,195 +786,6 @@ class Breeze_Settings_Import_Export {
 	}
 
 	/**
-	 * Sanitize imported HTML double-check loader overlay color.
-	 *
-	 * @param mixed $overlay_color Imported color value.
-	 * @return string
-	 */
-	private static function sanitize_doublecheck_overlay_color( $overlay_color ) {
-		$overlay_color = trim( (string) $overlay_color );
-
-		if ( '' === $overlay_color ) {
-			return '';
-		}
-
-		if ( 1 === preg_match( '/^#[A-Fa-f0-9]{6}$/', $overlay_color ) ) {
-			return $overlay_color;
-		}
-
-		return '';
-	}
-
-	/**
-	 * Sanitize imported HTML Double-check selectors.
-	 *
-	 * Uses the same limits and allowlist as File Options save:
-	 * 200 lines, 150 characters per line, simple selector pattern, no root tags.
-	 *
-	 * @param mixed $elements Imported selector list.
-	 * @return array
-	 */
-	private static function sanitize_doublecheck_elements( $elements ) {
-		$sanitized_data = breeze_sanitize_doublecheck_selectors( $elements );
-
-		return $sanitized_data['selectors'];
-	}
-
-	/**
-	 * Sanitize imported HTML double-check exclude URLs.
-	 *
-	 * @param mixed $exclude_urls Imported exclude URL list.
-	 * @return array
-	 */
-	private static function sanitize_doublecheck_exclude_urls( $exclude_urls ) {
-		$sanitized_data = self::sanitize_doublecheck_exclude_urls_with_meta( $exclude_urls );
-
-		return $sanitized_data['urls'];
-	}
-
-	/**
-	 * Sanitize imported HTML double-check exclude URLs with metadata.
-	 *
-	 * @param mixed $exclude_urls Imported exclude URL list.
-	 * @return array{
-	 *     urls: array,
-	 *     removed_invalid: int,
-	 *     removed_duplicates: int
-	 * }
-	 */
-	private static function sanitize_doublecheck_exclude_urls_with_meta( $exclude_urls ) {
-		if ( ! is_array( $exclude_urls ) ) {
-			return array(
-				'urls'               => array(),
-				'removed_invalid'    => 0,
-				'removed_duplicates' => 0,
-			);
-		}
-
-		$sanitized_urls      = array();
-		$seen_urls           = array();
-		$removed_invalid     = 0;
-		$removed_duplicates  = 0;
-
-		foreach ( $exclude_urls as $exclude_url ) {
-			$normalized_url = self::sanitize_single_doublecheck_exclude_url( $exclude_url );
-			if ( '' === $normalized_url ) {
-				++$removed_invalid;
-				continue;
-			}
-
-			if ( isset( $seen_urls[ $normalized_url ] ) ) {
-				++$removed_duplicates;
-				continue;
-			}
-
-			$seen_urls[ $normalized_url ] = true;
-			$sanitized_urls[]             = $normalized_url;
-		}
-
-		return array(
-			'urls'               => $sanitized_urls,
-			'removed_invalid'    => $removed_invalid,
-			'removed_duplicates' => $removed_duplicates,
-		);
-	}
-
-	/**
-	 * Sanitize one imported HTML double-check exclude URL.
-	 *
-	 * @param mixed $exclude_url Imported exclude URL.
-	 * @return string
-	 */
-	private static function sanitize_single_doublecheck_exclude_url( $exclude_url ) {
-		$exclude_url = trim( (string) $exclude_url );
-		if ( '' === $exclude_url ) {
-			return '';
-		}
-
-		if ( '/' === $exclude_url[0] ) {
-			$sanitized_path = sanitize_text_field( $exclude_url );
-			if ( 1 === preg_match( '#^/[A-Za-z0-9/_\-\.\~\%\?\=&]*$#', $sanitized_path ) ) {
-				return $sanitized_path;
-			}
-
-			return '';
-		}
-
-		$sanitized_url = esc_url_raw( $exclude_url, array( 'http', 'https' ) );
-		if ( '' === $sanitized_url ) {
-			return '';
-		}
-
-		$site_host = wp_parse_url( home_url(), PHP_URL_HOST );
-		$url_host  = wp_parse_url( $sanitized_url, PHP_URL_HOST );
-		if ( ! is_string( $site_host ) || ! is_string( $url_host ) ) {
-			return '';
-		}
-
-		if ( strtolower( $url_host ) !== strtolower( $site_host ) ) {
-			return '';
-		}
-
-		return $sanitized_url;
-	}
-
-	/**
-	 * Build notice after sanitizing imported HTML double-check exclude URLs.
-	 *
-	 * @param int $removed_invalid Number of removed invalid or non-local entries.
-	 * @param int $removed_duplicates Number of removed duplicates.
-	 * @return string
-	 */
-	private static function get_doublecheck_exclude_urls_notice_message( $removed_invalid, $removed_duplicates ) {
-		$messages = array();
-		$removed_invalid = (int) $removed_invalid;
-		$removed_duplicates = (int) $removed_duplicates;
-
-		if ( $removed_invalid > 0 ) {
-			$messages[] = sprintf(
-				/* translators: %d: number of removed invalid entries */
-				_n(
-					'%d exclude URL entry was removed because only local URLs are allowed.',
-					'%d exclude URL entries were removed because only local URLs are allowed.',
-					$removed_invalid,
-					'breeze'
-				),
-				$removed_invalid
-			);
-		}
-
-		if ( $removed_duplicates > 0 ) {
-			$messages[] = sprintf(
-				/* translators: %d: number of removed duplicates */
-				_n(
-					'%d duplicate exclude URL entry was removed.',
-					'%d duplicate exclude URL entries were removed.',
-					$removed_duplicates,
-					'breeze'
-				),
-				$removed_duplicates
-			);
-		}
-
-		return implode( ' ', $messages );
-	}
-
-	/** Strong = >=32 chars, alphanumeric, >=8 distinct chars. @since 2.5.4 */
-	private static function is_strong_api_token( $token ) {
-		$token = (string) $token;
-		return strlen( $token ) >= 32 && preg_match( '/^[A-Za-z0-9]+$/', $token ) && count( count_chars( $token, 1 ) ) >= 8;
-	}
-
-	/** Keep imported token if strong, else fall back to stored, else mint a fresh one. @since 2.5.4 */
-	private static function sanitize_imported_api_token( $incoming, array $current_advanced = array() ) {
-		if ( self::is_strong_api_token( $incoming ) ) {
-			return (string) $incoming;
-		}
-		$stored = isset( $current_advanced['breeze-api-token'] ) ? $current_advanced['breeze-api-token'] : '';
-		return self::is_strong_api_token( $stored ) ? (string) $stored : Breeze_Configuration::breeze_generate_token();
-	}
-
-	/**
 	 * Validate all the options in the group given.
 	 *
 	 * @param $option_group
@@ -1188,29 +804,8 @@ class Breeze_Settings_Import_Export {
 		$changed_options = $option_group;
 
 		if ( ! empty( $option_group ) && is_array( $option_group ) ) {
-			if ( 'breeze_file_settings' === $group_name && array_key_exists( 'breeze-doublecheck-elements', $option_group ) ) {
-				$elements_data = breeze_sanitize_doublecheck_selectors( $option_group['breeze-doublecheck-elements'] );
-				$changed_options['breeze-doublecheck-elements'] = $elements_data['selectors'];
-			}
-
-			if ( 'breeze_file_settings' === $group_name && isset( $option_group['breeze-doublecheck-exclude-url'] ) ) {
-				$exclude_data = self::sanitize_doublecheck_exclude_urls_with_meta( $option_group['breeze-doublecheck-exclude-url'] );
-				$changed_options['breeze-doublecheck-exclude-url'] = $exclude_data['urls'];
-				$changed_options['breeze-doublecheck-exclude-url-error'] = self::get_doublecheck_exclude_urls_notice_message(
-					$exclude_data['removed_invalid'],
-					$exclude_data['removed_duplicates']
-				);
-			}
 
 			foreach ( $option_group as $option_name => $option_value ) {
-				if ( 'breeze_file_settings' === $group_name && 'breeze-doublecheck-exclude-url' === $option_name ) {
-					continue;
-				}
-
-				if ( 'breeze_file_settings' === $group_name && 'breeze-doublecheck-elements' === $option_name ) {
-					continue;
-				}
-
 				$changed_options[ $option_name ] = self::validate_json_entry( $option_value, $option_name );
 			}
 

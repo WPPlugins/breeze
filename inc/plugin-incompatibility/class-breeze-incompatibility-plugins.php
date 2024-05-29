@@ -44,7 +44,6 @@ if ( ! class_exists( 'Breeze_Incompatibility_Plugins' ) ) {
 		}
 
 		public function compatibility_warning_close() {
-			check_ajax_referer( '_breeze_check_compat', 'security' );
 			$response            = array();
 			$response['success'] = false;
 			// Only administrator can close this notice.
@@ -73,7 +72,7 @@ if ( ! class_exists( 'Breeze_Incompatibility_Plugins' ) ) {
 				// Start the notice row.
 				if ( ! empty( $this->notification_message ) ) {
 					// Display catched notifications.
-					echo wp_kses_post( $this->notification_message );
+					echo $this->notification_message;
 				}
 				// End the notice row.
 
@@ -124,7 +123,6 @@ if ( ! class_exists( 'Breeze_Incompatibility_Plugins' ) ) {
 			$installed_plugins = $this->plugins_list();
 			// Fetch the list of incompatible/conflicting plugins data
 			$incompatible_plugins = $this->list_of_incompatible_plugins();
-
 			$final_list           = array();
 			$context              = $status;
 
@@ -357,12 +355,6 @@ if ( ! class_exists( 'Breeze_Incompatibility_Plugins' ) ) {
 					'safe_version_message' => '',
 				),
 				'speed-booster-pack/speed-booster-pack.php' => array(
-					'warning_message'      => '',
-					'warning_version'      => - 1,
-					'compare_sign'         => '>',
-					'safe_version_message' => '',
-				),
-				'wp-rocket/wp-rocket.php' => array(
 					'warning_message'      => '',
 					'warning_version'      => - 1,
 					'compare_sign'         => '>',
