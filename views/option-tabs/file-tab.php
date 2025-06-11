@@ -23,378 +23,25 @@ $excluded_css_check_extension = true;
 $excluded_js_check_extension  = true;
 $excluded_url_list            = true;
 
-$breeze_wp_ghost_active = defined( 'HMWP_VERSION' ) || defined( 'HMWP_PATH' ) || class_exists( 'HMWP', false );
-
 $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 ?>
 <form data-section="file">
 	<?php if ( true === $is_custom ) { ?>
-        <div class="br-overlay-disable"><?php esc_html_e( 'Settings are inherited', 'breeze' ); ?></div>
+        <div class="br-overlay-disable"><?php _e( 'Settings are inherited', 'breeze' ); ?></div>
 	<?php } ?>
-
-    <?php
-    Breeze_One_Click_Optimization::one_click_optimization_notice();
-    ?>
-
-	<section>
+    <section>
         <div class="br-section-title">
-            <img src="<?php echo esc_url( $icon ); ?>"/>
-			<?php esc_html_e( 'FILE OPTIMIZATION', 'breeze' ); ?>
+            <img src="<?php echo $icon; ?>"/>
+			<?php _e( 'FILE OPTIMIZATION', 'breeze' ); ?>
         </div>
 
-        <div class="br-option-group br-top">
-            <span class="section-title"><?php esc_html_e( 'HTML Settings', 'breeze' ); ?></span>
+        <div class="br-option-group">
+            <span class="section-title"><?php _e( 'HTML Settings', 'breeze' ); ?></span>
             <!-- START OPTION -->
-            <div class="br-beta br-option-item br-top">
+            <div class="br-option-item br-top">
                 <div class="br-label">
                     <div class="br-option-text">
-                        <?php esc_html_e( 'Cache Full Page HTML', 'breeze' ); ?>
-                    </div>
-                </div>
-                <div class="br-option">
-                    <?php
-                    $html_cache_setting = array_key_exists( 'breeze-enable-html-cache', $options ) ? $options['breeze-enable-html-cache'] : '1';
-                    $basic_value        = filter_var( $html_cache_setting, FILTER_VALIDATE_BOOLEAN );
-                    $is_enabled         = ( true === $basic_value ) ? checked( $html_cache_setting, '1', false ) : '';
-                    ?>
-                    <div class="on-off-checkbox">
-                        <label class="br-switcher">
-                            <input id="enable-html-cache" name="enable-html-cache" type="checkbox" class="br-box"
-                                   value="1" <?php echo esc_attr($is_enabled); ?>>
-                            <div class="br-see-state">
-                            </div>
-                        </label><br>
-                    </div>
-
-                    <div class="br-note">
-                        <p>
-                            <?php
-                            esc_html_e( 'Saves a copy of the page so it can load faster. This is not the same as Cache System in the Basic tab.', 'breeze' );
-                            ?>
-                        </p>
-                        <p>
-                            <?php
-                            esc_html_e( 'Recommend: keep this on for faster pages.', 'breeze' );
-                            ?>
-                        </p>
-
-                        <p class="br-important">
-                            <?php
-                            echo '<strong>';
-                            esc_html_e( 'Important: ', 'breeze' );
-                            echo '</strong>';
-                            esc_html_e( 'This option works at the plugin level. Varnish still runs on the server.', 'breeze' );
-                            ?>
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <!-- END OPTION -->
-
-            <!-- START OPTION -->
-            <?php
-            $enable_html_cache = isset( $options['breeze-enable-html-cache'] ) ? filter_var( $options['breeze-enable-html-cache'], FILTER_VALIDATE_BOOLEAN ) : '1';
-
-            $disable_overlay = '';
-            if ( false === $enable_html_cache ) {
-                $disable_overlay = ' br-apply-disable';
-            }
-            ?>
-            <div class="br-beta br-option-item<?php echo $disable_overlay; ?>">
-                <div class="br-label">
-                    <div class="br-option-text">
-                        <?php esc_html_e( 'Refresh Cached Page Parts', 'breeze' ); ?>
-                    </div>
-                </div>
-                <div class="br-option">
-                    <?php
-                    $basic_value = isset( $options['breeze-html-doublecheck'] ) ? filter_var( $options['breeze-html-doublecheck'], FILTER_VALIDATE_BOOLEAN ) : false;
-                    $is_enabled  = ( isset( $basic_value ) && true === $basic_value ) ? checked( $options['breeze-html-doublecheck'], '1', false ) : '';
-                    ?>
-                    <div class="on-off-checkbox">
-                        <label class="br-switcher">
-                            <input id="html-doublecheck" name="html-doublecheck" type="checkbox" class="br-box"
-                                   value="0" <?php echo esc_attr($is_enabled); ?>>
-                            <div class="br-see-state">
-                            </div>
-                        </label><br>
-                    </div>
-
-                    <div class="br-note">
-                        <p>
-                            <?php
-                            esc_html_e( 'After the cached page loads, Breeze refreshes only the page parts you list below so they stay up to date.', 'breeze' );
-                            ?>
-                        </p>
-
-                        <p class="br-important">
-                            <?php
-                            echo '<strong>';
-                            esc_html_e( 'Important: ', 'breeze' );
-                            echo '</strong>';
-                            esc_html_e( 'Use this only when a cached page shows old content in one block, such as a mini-cart.', 'breeze' );
-                            ?>
-                        </p>
-                        <p class="br-important">
-                            <?php
-                            echo '<strong>';
-                            esc_html_e( 'Caution: ', 'breeze' );
-                            echo '</strong>';
-                            esc_html_e( 'This option can affect page response. Leave it off if the site already looks correct.', 'breeze' );
-                            ?>
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <!-- END OPTION -->
-
-            <div class="doublecheck-options">
-                <!-- START OPTION -->
-                <?php
-
-
-                $dc_enabled       = isset( $options['breeze-html-doublecheck'] ) ? filter_var( $options['breeze-html-doublecheck'], FILTER_VALIDATE_BOOLEAN ) : false;
-                $is_front_display = '';
-                if ( false === $dc_enabled ) {
-                    $is_front_display = ' style="display: none"';
-                }
-
-
-                $doublecheck_elements = '';
-                if ( ! empty( $options['breeze-doublecheck-elements'] ) ) {
-                    $output               = implode( "\n", $options['breeze-doublecheck-elements'] );
-                    $doublecheck_elements = esc_textarea( $output );
-                }
-
-                ?>
-                <div class="br-beta br-option-item" <?php echo $is_front_display; ?>>
-                    <div class="br-label">
-                        <div class="br-option-text">
-                            <?php esc_html_e( 'Page Parts To Refresh', 'breeze' ); ?>
-                        </div>
-                    </div>
-                    <div class="br-option">
-					<textarea cols="100" rows="7" id="doublecheck-elements" name="doublecheck-elements"
-                              placeholder="Example:&#10;#site-header-cart"><?php echo esc_attr($doublecheck_elements); ?></textarea>
-                        <div class="br-note">
-                            <p>
-                                <?php
-                                echo wp_kses(
-                                    sprintf(
-                                        /* translators: 1: "# for an ID" in bold, 2: ". for a class" in bold */
-                                        __( 'Enter one page part per line, for example #site-header-cart. Use %1$s and %2$s.', 'breeze' ),
-                                        '<strong># for an ID</strong>',
-                                        '<strong>. for a class</strong>'
-                                    ),
-                                    array(
-                                        'strong' => array(),
-                                    )
-                                );
-                                ?>
-                            </p>
-							<p class="br-important">
-								<?php
-								echo '<strong>';
-								esc_html_e( 'Important: ', 'breeze' );
-								echo '</strong>';
-								esc_html_e( 'Do not enter html, body, or head. You can still target something inside the page, such as body .mini-cart. Do not target login, checkout, or add-to-cart forms.', 'breeze' );
-								?>
-							</p>
-							<?php if ( ! empty( $options['breeze-doublecheck-elements-error'] ) ) { ?>
-								<p class="br-notice">
-									<?php echo esc_html( $options['breeze-doublecheck-elements-error'] ); ?>
-								</p>
-							<?php } ?>
-                        </div>
-                    </div>
-                </div>
-                <!-- END OPTION -->
-
-                <!-- START OPTION -->
-                <?php
-                $doublecheck_load_options = array(
-                        'preload' => __( 'Before Load', 'breeze' ),
-                        'onload'  => __( 'After loaded', 'breeze' ),
-                        'async'   => __( 'Async', 'breeze' ),
-                );
-
-                ?>
-                <div class="br-beta br-option-item loading-type-option" style="display: none !important">
-                    <div class="br-label">
-                        <div class="br-option-text">
-                            <?php esc_html_e( 'Double-check loading type', 'breeze' ); ?>
-                        </div>
-                    </div>
-                    <div class="br-option">
-                        <?php
-                        $select_active = isset( $options['breeze-doublecheck-load'] ) ? $options['breeze-doublecheck-load'] : '';
-                    
-                        if($select_active !== 'async') {
-                            $select_active = 'async';
-                        }
-                        ?>
-                        <select name="doublecheck-load" id="doublecheck-load">
-                            <?php
-                            foreach ( $doublecheck_load_options as $value => $label ) {
-                                $selected = '';
-                                if ( $select_active === (string) $value || empty( $select_active ) ) {
-                                    $selected = 'selected';
-                                }
-                                $value = esc_attr($value);
-                                $label = esc_html($label);
-                                echo "<option value='{$value}' {$selected}>{$label}</option>";
-                            }
-                            ?>
-                        </select>
-
-                    </div>
-                </div>
-                <!-- END OPTION -->
-
-                <!-- START OPTION -->
-                <?php
-                $dc_enabled       = isset( $options['breeze-html-doublecheck'] ) ? filter_var( $options['breeze-html-doublecheck'], FILTER_VALIDATE_BOOLEAN ) : false;
-                $is_front_display = '';
-                if ( false === $dc_enabled ) {
-                    $is_front_display = ' style="display: none"';
-                }
-                ?>
-
-                <div class="br-beta br-option-item" <?php echo $is_front_display; ?>>
-                    <div class="br-label">
-                        <div class="br-option-text">
-                            <?php esc_html_e( 'Show Loading Overlay', 'breeze' ); ?>
-                        </div>
-                    </div>
-                    <div class="br-option">
-                        <?php
-                        $basic_value = isset( $options['breeze-html-doublecheck-loader'] ) ? filter_var( $options['breeze-html-doublecheck-loader'], FILTER_VALIDATE_BOOLEAN ) : false;
-                        $is_enabled  = ( isset( $basic_value ) && true === $basic_value ) ? checked( $options['breeze-html-doublecheck-loader'], '1', false ) : '';
-                        ?>
-                        <div class="on-off-checkbox">
-                            <label class="br-switcher">
-                                <input id="html-doublecheck-loader" name="html-doublecheck-loader" type="checkbox"
-                                       class="br-box"
-                                       value="1" <?php echo esc_attr($is_enabled); ?>>
-                                <div class="br-see-state">
-                                </div>
-                            </label><br>
-                        </div>
-
-                        <div class="br-note">
-                            <p>
-                                <?php
-                                esc_html_e( 'Shows a short overlay while those page parts update. This depends on your theme and may not look perfect on every site.', 'breeze' );
-                                ?>
-                            </p>
-                            <p class="br-important">
-                                <?php
-                                echo '<strong>';
-                                esc_html_e( 'Note: ', 'breeze' );
-                                echo '</strong>';
-                                esc_html_e( 'Theme developers can style the overlay using the class breeze-dc-elem.', 'breeze' );
-                                ?>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <!-- END OPTION -->
-            </div>
-
-            <!-- START OPTION -->
-            <?php
-            $dc_enabled       = isset( $options['breeze-html-doublecheck-loader'] ) ? filter_var( $options['breeze-html-doublecheck-loader'], FILTER_VALIDATE_BOOLEAN ) : false;
-            $is_front_display = '';
-            if ( false === $dc_enabled ) {
-                $is_front_display = ' style="display: none"';
-            }
-            ?>
-
-            <div class="br-beta br-option-item" <?php echo $is_front_display; ?>>
-                <div class="br-label">
-                    <div class="br-option-text">
-                        <?php esc_html_e( 'Overlay Color', 'breeze' ); ?>
-                    </div>
-                </div>
-                <div class="br-option">
-                    <?php
-                    $basic_value = ( ! empty( $options['breeze-html-doublecheck-loader-overlay'] ) ? esc_attr( $options['breeze-html-doublecheck-loader-overlay'] ) : '#000000' );
-                    ?>
-                    <div class="on-off-checkbox br-doublecheck-color-control">
-                        <input id="html-doublecheck-loader-overlay-picker" type="color"
-                               pattern="^#[A-Fa-f0-9]{6}$" class="br-doublecheck-color-picker" value="<?php echo esc_attr( $basic_value ); ?>">
-                        <input id="html-doublecheck-loader-overlay" name="html-doublecheck-loader-overlay" type="text"
-                               placeholder="#000000" pattern="^#[A-Fa-f0-9]{6}$" class="br-box br-doublecheck-color-code" value="<?php echo esc_attr( $basic_value ); ?>">
-                    </div>
-
-                    <div class="br-note">
-                        <p>
-                            <?php
-                            esc_html_e( 'Set the background color for the loading overlay.', 'breeze' );
-                            ?>
-                        </p>
-
-                    </div>
-                </div>
-            </div>
-            <!-- END OPTION -->
-
-            <!-- START OPTION -->
-            <?php
-            // Exclusions apply whenever Double-check runs, so this row follows
-            // Refresh Cached Page Parts. The loader toggle only reveals Overlay Color.
-            $dc_enabled       = isset( $options['breeze-html-doublecheck'] ) ? filter_var( $options['breeze-html-doublecheck'], FILTER_VALIDATE_BOOLEAN ) : false;
-            $is_front_display = '';
-            if ( false === $dc_enabled ) {
-                $is_front_display = ' style="display: none"';
-            }
-
-
-            $doublecheck_elements = '';
-            if ( ! empty( $options['breeze-doublecheck-exclude-url'] ) ) {
-                $output               = implode( "\n", $options['breeze-doublecheck-exclude-url'] );
-                $doublecheck_elements = esc_textarea( $output );
-            }
-
-            ?>
-            <div class="br-beta br-option-item" <?php echo $is_front_display; ?>>
-                <div class="br-label">
-                    <div class="br-option-text">
-                        <?php esc_html_e( 'Do Not Refresh On These Pages', 'breeze' ); ?>
-                    </div>
-                </div>
-                <div class="br-option">
-					<textarea cols="100" rows="7" id="doublecheck-exclude-url" name="doublecheck-exclude-url"
-                              placeholder="Example:&#10;yourwebsite.com/posttype/post"><?php echo $doublecheck_elements; ?></textarea>
-                    <div class="br-note">
-                        <p>
-                            <?php
-                            esc_html_e( 'Add one full page URL or path per line, for example /cart/. Exact page only. The page can still be cached.', 'breeze' );
-                            ?>
-                        </p>
-                        <p class="br-important">
-                            <?php
-                            echo '<strong>';
-                            esc_html_e( 'Important: ', 'breeze' );
-                            echo '</strong>';
-                            esc_html_e( 'Wildcards such as /shop/* are not allowed. Use Never Cache URLs if the whole page must stay uncached.', 'breeze' );
-                            ?>
-                        </p>
-						<?php if ( ! empty( $options['breeze-doublecheck-exclude-url-error'] ) ) { ?>
-							<p class="br-notice">
-								<?php echo esc_html( $options['breeze-doublecheck-exclude-url-error'] ); ?>
-							</p>
-						<?php } ?>
-                    </div>
-                </div>
-            </div>
-            <!-- END OPTION -->
-
-            <!-- START OPTION -->
-            <div class="br-option-item">
-                <div class="br-label">
-                    <div class="br-option-text">
-						<?php esc_html_e( 'HTML Minify', 'breeze' ); ?>
+						<?php _e( 'HTML Minify', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
@@ -404,7 +51,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 					?>
                     <div class="on-off-checkbox">
                         <label class="br-switcher">
-                            <input id="minification-html" name="minification-html" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled ); ?>>
+                            <input id="minification-html" name="minification-html" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?>>
                             <div class="br-see-state">
                             </div>
                         </label><br>
@@ -414,25 +61,20 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
                         <p>
 							<?php
 
-							esc_html_e( 'Minifying HTML removes whitespace and comments to reduce the size.', 'breeze' );
+							_e( 'Minifying HTML removes whitespace and comments to reduce the size.', 'breeze' );
 							?>
                         </p>
 
                         <p class="br-important">
 							<?php
 							echo '<strong>';
-							esc_html_e( 'Important: ', 'breeze' );
+							_e( 'Important: ', 'breeze' );
 							echo '</strong>';
-							esc_html_e( 'We recommend testing minification on a staging website before deploying it on a live website. ', 'breeze' );
+							_e( 'We recommend testing minification on a staging website before deploying it on a live website. ', 'breeze' );
 							echo '<br/>';
-							esc_html_e( 'Minification is known to cause issues on the frontend.', 'breeze' );
+							_e( 'Minification is known to cause issues on the frontend.', 'breeze' );
 							?>
                         </p>
-						<?php if ( $breeze_wp_ghost_active ) { ?>
-							<p class="br-notice">
-								<?php esc_html_e( 'WP Ghost is active. Disable HTML Minify to avoid layout issues, as it is not compatible with WP Ghost.', 'breeze' ); ?>
-							</p>
-						<?php } ?>
                     </div>
                 </div>
             </div>
@@ -441,12 +83,12 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
         <!-- START GROUP -->
         <div class="br-option-group">
-            <span class="section-title"><?php esc_html_e( 'CSS Settings', 'breeze' ); ?></span>
+            <span class="section-title"><?php _e( 'CSS Settings', 'breeze' ); ?></span>
             <!-- START OPTION -->
             <div class="br-option-item br-top">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'CSS Minify', 'breeze' ); ?>
+						<?php _e( 'CSS Minify', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
@@ -462,7 +104,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 					?>
                     <div class="on-off-checkbox">
                         <label class="br-switcher">
-                            <input id="minification-css" name="minification-css" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled ); ?>>
+                            <input id="minification-css" name="minification-css" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?>>
                             <div class="br-see-state">
                             </div>
                         </label><br>
@@ -470,7 +112,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
                     <div class="br-note">
                         <p>
-							<?php esc_html_e( 'Minify CSS removes whitespace and comments to reduce the file size.', 'breeze' ); ?>
+							<?php _e( 'Minify CSS removes whitespace and comments to reduce the file size.', 'breeze' ); ?>
                         </p>
                     </div>
 
@@ -483,28 +125,28 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 					$basic_value = isset( $options['breeze-font-display-swap'] ) ? filter_var( $options['breeze-font-display-swap'], FILTER_VALIDATE_BOOLEAN ) : false;
 					$is_enabled  = ( isset( $basic_value ) && true === $basic_value ) ? checked( $options['breeze-font-display-swap'], '1', false ) : '';
 					?>
-                    <div id="font-display-swap" <?php echo esc_attr( $is_font_display ); ?>>
+                    <div id="font-display-swap" <?php echo $is_font_display; ?>>
                         <div class="on-off-checkbox">
                             <label class="br-switcher">
-                                <input id="font-display" name="font-display" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled ); ?>>
+                                <input id="font-display" name="font-display" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?>>
                                 <div class="br-see-state">
                                 </div>
                             </label><br>
                         </div>
 
                         <p>
-							<?php esc_html_e( 'Font remain visible during load', 'breeze' ); ?><br/>
+							<?php _e( 'Font remain visible during load', 'breeze' ); ?><br/>
                         </p>
                     </div>
 
                     <p class="br-important">
 						<?php
 						echo '<strong>';
-						esc_html_e( 'Important: ', 'breeze' );
+						_e( 'Important: ', 'breeze' );
 						echo '</strong>';
-						esc_html_e( 'We recommend testing minification on a staging website before deploying it on a live website. ', 'breeze' );
+						_e( 'We recommend testing minification on a staging website before deploying it on a live website. ', 'breeze' );
 						echo '<br/>';
-						esc_html_e( 'Minification is known to cause issues on the frontend.', 'breeze' );
+						_e( 'Minification is known to cause issues on the frontend.', 'breeze' );
 						?>
                     </p>
                 </div>
@@ -523,17 +165,17 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 				$disable_overlay = ' br-apply-disable';
 			}
 			?>
-            <div class="br-option-item<?php echo esc_attr( $disable_overlay ); ?>">
+            <div class="br-option-item<?php echo $disable_overlay; ?>">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'Include Inline CSS', 'breeze' ); ?>
+						<?php _e( 'Include Inline CSS', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
 
                     <div class="on-off-checkbox">
                         <label class="br-switcher">
-                            <input id="include-inline-css" name="include-inline-css" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled ); ?> <?php echo esc_attr( $disable_inline_css ); ?>>
+                            <input id="include-inline-css" name="include-inline-css" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?> <?php echo $disable_inline_css; ?>>
                             <div class="br-see-state">
                             </div>
                         </label><br>
@@ -541,7 +183,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
                     <div class="br-note">
                         <p>
-							<?php esc_html_e( 'Minify Inline CSS removes whitespace and create seprate cache file for inline CSS.', 'breeze' ); ?>
+							<?php _e( 'Minify Inline CSS removes whitespace and create seprate cache file for inline CSS.', 'breeze' ); ?>
                         </p>
                     </div>
                 </div>
@@ -561,17 +203,17 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 				$disable_overlay = ' br-apply-disable';
 			}
 			?>
-            <div class="br-option-item<?php echo esc_attr( $disable_overlay ); ?>">
+            <div class="br-option-item<?php echo $disable_overlay; ?>">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'Combine CSS', 'breeze' ); ?>
+						<?php _e( 'Combine CSS', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
 
                     <div class="on-off-checkbox">
                         <label class="br-switcher">
-                            <input id="group-css" name="group-css" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled ); ?> <?php echo esc_attr( $disable_group_css ); ?>>
+                            <input id="group-css" name="group-css" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?> <?php echo $disable_group_css; ?>>
                             <div class="br-see-state">
                             </div>
                         </label><br>
@@ -579,7 +221,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
                     <div class="br-note">
                         <p>
-							<?php esc_html_e( 'Combine CSS merges all your minified files into a single file, reducing HTTP requests.', 'breeze' ); ?>
+							<?php _e( 'Combine CSS merges all your minified files into a single file, reducing HTTP requests.', 'breeze' ); ?>
                         </p>
                     </div>
                 </div>
@@ -606,29 +248,29 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 				$disable_overlay = ' br-apply-disable';
 			}
 			?>
-            <div class="br-option-item<?php echo esc_attr( $disable_overlay ); ?>">
+            <div class="br-option-item<?php echo $disable_overlay; ?>">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'Exclude CSS', 'breeze' ); ?>
+						<?php _e( 'Exclude CSS', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
 
 					<textarea cols="100" rows="7" id="exclude-css" name="exclude-css"
-                              placeholder="Exclude CSS on the basis of the folder&#10;https://demo/wp-content/plugins/some-plugin/assets/css/demo(.*)&#10;&#10;Exclude CSS on the basis of the file name&#10;https://demo/wp-content/plugins/some-plugin/assets/css/demo_1/css_random_someplugin_(.*).css"><?php echo esc_textarea( $css_output ); ?></textarea>
+                              placeholder="Exclude CSS on the basis of the folder&#10;https://demo/wp-content/plugins/some-plugin/assets/css/demo(.*)&#10;&#10;Exclude CSS on the basis of the file name&#10;https://demo/wp-content/plugins/some-plugin/assets/css/demo_1/css_random_someplugin_(.*).css"><?php echo $css_output; ?></textarea>
                     <div class="br-note">
                         <p>
 							<?php
 
-							esc_html_e( 'Use this option to exclude CSS files from Minification and Grouping. Enter the URLs of CSS files on each line.', 'breeze' );
+							_e( 'Use this option to exclude CSS files from Minification and Grouping. Enter the URLs of CSS files on each line.', 'breeze' );
 							?>
                         </p>
                         <p class="br-notice">
 							<?php if ( false === $excluded_css_check_extension ) { ?>
-								<?php esc_html_e( 'One (or more) URL is incorrect. Please confirm that all URLs have the .css extension', 'breeze' ); ?>
+								<?php _e( 'One (or more) URL is incorrect. Please confirm that all URLs have the .css extension', 'breeze' ); ?>
 							<?php } ?>
 							<?php if ( false === $excluded_css_check ) { ?>
-								<?php esc_html_e( 'One (or more) URL is invalid. Please check and correct the entry.', 'breeze' ); ?>
+								<?php _e( 'One (or more) URL is invalid. Please check and correct the entry.', 'breeze' ); ?>
 							<?php } ?>
                         </p>
                     </div>
@@ -639,12 +281,12 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
         <!-- START GROUP -->
         <div class="br-option-group">
-            <span class="section-title"><?php esc_html_e( 'JS Settings', 'breeze' ); ?></span>
+            <span class="section-title"><?php _e( 'JS Settings', 'breeze' ); ?></span>
             <!-- START OPTION -->
             <div class="br-option-item br-top">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'JS Minify', 'breeze' ); ?>
+						<?php _e( 'JS Minify', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
@@ -659,7 +301,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 					?>
                     <div class="on-off-checkbox">
                         <label class="br-switcher">
-                            <input id="minification-js" name="minification-js" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled ); ?>>
+                            <input id="minification-js" name="minification-js" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?>>
                             <div class="br-see-state">
                             </div>
                         </label><br>
@@ -667,17 +309,17 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
                     <div class="br-note">
                         <p>
-							<?php esc_html_e( 'Minify JavaScript removes whitespace and comments to reduce the file size.', 'breeze' ); ?>
+							<?php _e( 'Minify JavaScript removes whitespace and comments to reduce the file size.', 'breeze' ); ?>
                         </p>
 
                         <p class="br-important">
 							<?php
 							echo '<strong>';
-							esc_html_e( 'Important: ', 'breeze' );
+							_e( 'Important: ', 'breeze' );
 							echo '</strong>';
-							esc_html_e( 'We recommend testing minification on a staging website before deploying it on a live website. ', 'breeze' );
+							_e( 'We recommend testing minification on a staging website before deploying it on a live website. ', 'breeze' );
 							echo '<br/>';
-							esc_html_e( 'Minification is known to cause issues on the frontend.', 'breeze' );
+							_e( 'Minification is known to cause issues on the frontend.', 'breeze' );
 							?>
                         </p>
                     </div>
@@ -702,17 +344,17 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 				$disable_overlay = ' br-apply-disable';
 			}
 			?>
-            <div class="br-option-item<?php echo esc_attr( $disable_overlay ); ?>">
+            <div class="br-option-item<?php echo $disable_overlay; ?>">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'Include Inline JS', 'breeze' ); ?>
+						<?php _e( 'Include Inline JS', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
 
                     <div class="on-off-checkbox">
                         <label class="br-switcher">
-                            <input id="include-inline-js" name="include-inline-js" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled ); ?> <?php echo esc_attr( $disable_inline_js ); ?>>
+                            <input id="include-inline-js" name="include-inline-js" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?> <?php echo $disable_inline_js; ?>>
                             <div class="br-see-state">
                             </div>
                         </label><br>
@@ -720,7 +362,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
                     <div class="br-note">
                         <p>
-							<?php esc_html_e( 'Minify Inline JS removes whitespace and create seprate cache file for inline JS.', 'breeze' ); ?>
+							<?php _e( 'Minify Inline JS removes whitespace and create seprate cache file for inline JS.', 'breeze' ); ?>
 
                         </p>
                     </div>
@@ -741,16 +383,16 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 				$disable_overlay = ' br-apply-disable';
 			}
 			?>
-            <div class="br-option-item<?php echo esc_attr( $disable_overlay ); ?>">
+            <div class="br-option-item<?php echo $disable_overlay; ?>">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'Combine JS', 'breeze' ); ?>
+						<?php _e( 'Combine JS', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
                     <div class="on-off-checkbox">
                         <label class="br-switcher">
-                            <input id="group-js" name="group-js" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled ); ?> <?php echo esc_attr( $disable_group_js ); ?>>
+                            <input id="group-js" name="group-js" type="checkbox" class="br-box" value="1" <?php echo $is_enabled; ?> <?php echo $disable_group_js; ?>>
                             <div class="br-see-state">
                             </div>
                         </label><br>
@@ -758,15 +400,15 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
                     <div class="br-note">
                         <p>
-							<?php esc_html_e( 'Combine JS merges all your minified files into a single file, reducing HTTP requests.', 'breeze' ); ?>
+							<?php _e( 'Combine JS merges all your minified files into a single file, reducing HTTP requests.', 'breeze' ); ?>
                         </p>
                         <p class="br-important">
 
 							<?php
 							echo '<strong>';
-							esc_html_e( 'Important: ', 'breeze' );
+							_e( 'Important: ', 'breeze' );
 							echo '</strong>';
-							esc_html_e( 'This option can\'t be combined with "Delay JS Inline Script" or "Delay All JavaScript" .', 'breeze' );
+							_e( 'This option can\'t be combined with "Delay JS Inline Script" or "Delay All JavaScript" .', 'breeze' );
 							?>
                         </p>
                     </div>
@@ -796,28 +438,28 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 			}
 
 			?>
-            <div class="br-option-item<?php echo esc_attr( $disable_overlay ); ?>">
+            <div class="br-option-item<?php echo $disable_overlay; ?>">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'Exclude JS', 'breeze' ); ?>
+						<?php _e( 'Exclude JS', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
 					<textarea cols="100" rows="7" id="exclude-js" name="exclude-js"
-                              placeholder="Exclude JS on the basis of the folder&#10;https://demo/wp-content/plugins/some-plugin/assets/js/demo(.*)&#10;&#10;Exclude JS on the basis of the file name&#10;https://demo/wp-content/plugins/some-plugin/assets/js/demo_1/js_random_someplugin_(.*).js"><?php echo esc_textarea( $js_output ); ?></textarea>
+                              placeholder="Exclude JS on the basis of the folder&#10;https://demo/wp-content/plugins/some-plugin/assets/js/demo(.*)&#10;&#10;Exclude JS on the basis of the file name&#10;https://demo/wp-content/plugins/some-plugin/assets/js/demo_1/js_random_someplugin_(.*).js"><?php echo $js_output; ?></textarea>
                     <div class="br-note">
                         <p>
 							<?php
 
-							esc_html_e( 'Use this option to exclude JS files from Minification and Grouping. Enter the URLs of JS files on each line.', 'breeze' );
+							_e( 'Use this option to exclude JS files from Minification and Grouping. Enter the URLs of JS files on each line.', 'breeze' );
 							?>
                         </p>
                         <p class="br-notice">
 							<?php if ( false === $excluded_js_check_extension ) { ?>
-								<?php esc_html_e( 'One (or more) URL is incorrect. Please confirm that all URLs have the .js extension', 'breeze' ); ?>
+								<?php _e( 'One (or more) URL is incorrect. Please confirm that all URLs have the .js extension', 'breeze' ); ?>
 							<?php } ?>
 							<?php if ( false === $excluded_js_check ) { ?>
-								<?php esc_html_e( 'One (or more) URL is invalid. Please check and correct the entry.', 'breeze' ); ?>
+								<?php _e( 'One (or more) URL is invalid. Please check and correct the entry.', 'breeze' ); ?>
 							<?php } ?>
                         </p>
                     </div>
@@ -828,7 +470,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
             <div class="br-option-item">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'Delay JS Inline Scripts', 'breeze' ); ?>
+						<?php _e( 'Delay JS Inline Scripts', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
@@ -857,7 +499,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 					?>
                     <div class="on-off-checkbox">
                         <label class="br-switcher">
-                            <input <?php echo esc_attr( $delay_inline_disabled ); ?> id="enable-js-delay" name="enable-js-delay" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled_inlinejs ); ?> <?php echo esc_attr( $is_data_stop ); ?>>
+                            <input <?php echo $delay_inline_disabled; ?> id="enable-js-delay" name="enable-js-delay" type="checkbox" class="br-box" value="1" <?php echo $is_enabled_inlinejs; echo $is_data_stop;?>>
                             <div class="br-see-state">
                             </div>
                         </label><br>
@@ -874,29 +516,29 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 						$display_text_area = 'style="display:block"';
 					}
 					?>
-                    <div <?php echo esc_attr( $display_text_area ); ?> id="breeze-delay-js-scripts-div">
+                    <div <?php echo $display_text_area; ?> id="breeze-delay-js-scripts-div">
                         <br/>
-                        <textarea cols="100" rows="7" id="delay-js-scripts" name="delay-js-scripts"><?php echo esc_textarea( $js_output ); ?></textarea>
+                        <textarea cols="100" rows="7" id="delay-js-scripts" name="delay-js-scripts"><?php echo $js_output; ?></textarea>
                         <div class="br-note">
                             <p>
 								<?php
 
-								esc_html_e( 'You can add specific keywords to identify the inline JavaScript to be delayed. Each script identifying keyword must be added on a new line.', 'breeze' );
+								_e( 'You can add specific keywords to identify the inline JavaScript to be delayed. Each script identifying keyword must be added on a new line.', 'breeze' );
 								?>
-                                <a href="https://www.cloudways.com/blog/breeze-1-2-version-released/" target="_blank"><?php esc_html_e( 'More info here', 'breeze' ); ?></a>
+                                <a href="https://www.cloudways.com/blog/breeze-1-2-version-released/" target="_blank"><?php _e( 'More info here', 'breeze' ); ?></a>
                             </p>
                             <p class="br-notice">
-								<?php esc_html_e( 'Please clear Varnish after applying the new settings.', 'breeze' ); ?><br/>
-								<?php esc_html_e( 'This option can\'t be combined with "Combine JS" .', 'breeze' ); ?>
+								<?php _e( 'Please clear Varnish after applying the new settings.', 'breeze' ); ?><br/>
+								<?php _e( 'This option can\'t be combined with "Combine JS" .', 'breeze' ); ?>
                             </p>
                         </div>
                     </div>
                     <p class="br-important">
 						<?php
 						echo '<strong>';
-						esc_html_e( 'Important: ', 'breeze' );
+						_e( 'Important: ', 'breeze' );
 						echo '</strong>';
-						esc_html_e( 'Use only one option "Delay JS Inline Scripts" OR "Delay All JavaScript" at same time.', 'breeze' );
+						_e( 'Use only one option "Delay JS Inline Scripts" OR "Delay All JavaScript" at same time.', 'breeze' );
 						?>
                     </p>
                 </div>
@@ -907,7 +549,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
             <div class="br-option-item">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'Delay All JavaScript', 'breeze' ); ?>
+						<?php _e( 'Delay All JavaScript', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
@@ -932,7 +574,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 					?>
                     <div class="on-off-checkbox">
                         <label class="br-switcher">
-                            <input <?php echo esc_attr( $delay_js_disabled ); ?> id="breeze-delay-all-js" name="breeze-delay-all-js" type="checkbox" class="br-box" value="1" <?php echo esc_attr( $is_enabled_all ); echo esc_attr( $is_data_stop );?>>
+                            <input <?php echo $delay_js_disabled; ?> id="breeze-delay-all-js" name="breeze-delay-all-js" type="checkbox" class="br-box" value="1" <?php echo $is_enabled_all; echo $is_data_stop;?>>
                             <div class="br-see-state">
                             </div>
                         </label><br>
@@ -940,7 +582,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
                     <div class="br-note">
                         <p>
-							<?php esc_html_e( 'Improve the page load by delaying JavaScript execution.', 'breeze' ); ?>
+							<?php _e( 'Improve the page load by delaying JavaScript execution.', 'breeze' ); ?>
                         </p>
 
                         <p class="br-important">
@@ -969,20 +611,20 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
 					?>
 
-                    <div <?php echo esc_attr( $display_text_area ); ?> id="breeze-delay-js-scripts-div-all">
+                    <div <?php echo $display_text_area; ?> id="breeze-delay-js-scripts-div-all">
                         <br/>
-                        <div class="br-option-text"><strong><?php esc_html_e( 'List of scripts not to delay', 'breeze' ); ?></strong></div>
-                        <textarea cols="100" rows="7" id="no-delay-js-scripts" name="no-delay-js-scripts"><?php echo esc_textarea( $js_output ); ?></textarea>
+                        <div class="br-option-text"><strong><?php _e( 'List of scripts not to delay', 'breeze' ); ?></strong></div>
+                        <textarea cols="100" rows="7" id="no-delay-js-scripts" name="no-delay-js-scripts"><?php echo $js_output; ?></textarea>
                         <div class="br-note">
                             <p>
 								<?php
 
-								esc_html_e( 'You can add specific keywords to identify the Inline JavaScript or JavaScript files to not be delayed. Each script identifying keyword must be added on a new line.', 'breeze' );
+								_e( 'You can add specific keywords to identify the Inline JavaScript or JavaScript files to not be delayed. Each script identifying keyword must be added on a new line.', 'breeze' );
 								?>
                             </p>
                             <p class="br-notice">
-								<?php esc_html_e( 'Please clear Varnish after applying the new settings.', 'breeze' ); ?><br>
-								<?php esc_html_e( 'This option can\'t be combined with "Combine JS" .', 'breeze' ); ?>
+								<?php _e( 'Please clear Varnish after applying the new settings.', 'breeze' ); ?><br>
+								<?php _e( 'This option can\'t be combined with "Combine JS" .', 'breeze' ); ?>
 
                             </p>
                         </div>
@@ -990,9 +632,9 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
                     <p class="br-important">
 						<?php
 						echo '<strong>';
-						esc_html_e( 'Important: ', 'breeze' );
+						_e( 'Important: ', 'breeze' );
 						echo '</strong>';
-						esc_html_e( 'Use only one option "Delay JS Inline Scripts" OR "Delay All JavaScript" at same time.', 'breeze' );
+						_e( 'Use only one option "Delay JS Inline Scripts" OR "Delay All JavaScript" at same time.', 'breeze' );
 						?>
                     </p>
                 </div>
@@ -1002,7 +644,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
             <div class="br-option-item">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'Move JS Files to Footer', 'breeze' ); ?>
+						<?php _e( 'Move JS Files to Footer', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
@@ -1013,13 +655,13 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
                                     <input type="text" size="98"
                                            class="breeze-input-url"
                                            name="move-to-footer-js[]"
-                                           placeholder="<?php esc_attr_e( 'Enter URL...', 'breeze' ); ?>"
+                                           placeholder="<?php _e( 'Enter URL...', 'breeze' ); ?>"
                                            value="<?php echo esc_html( $js_url ); ?>"/>
                                     <span class="sort-handle">
 										<span class="dashicons dashicons-arrow-up moveUp"></span>
 										<span class="dashicons dashicons-arrow-down moveDown"></span>
 									</span>
-                                    <span class="dashicons dashicons-no item-remove" title="<?php esc_attr_e( 'Remove', 'breeze' ); ?>"></span>
+                                    <span class="dashicons dashicons-no item-remove" title="<?php _e( 'Remove', 'breeze' ); ?>"></span>
                                 </div>
 							<?php endforeach; ?>
 						<?php else : ?>
@@ -1028,34 +670,34 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
                                        class="breeze-input-url"
                                        id="move-to-footer-js"
                                        name="move-to-footer-js[]"
-                                       placeholder="<?php esc_attr_e( 'Enter URL...', 'breeze' ); ?>"
+                                       placeholder="<?php _e( 'Enter URL...', 'breeze' ); ?>"
                                        value=""/>
                                 <span class="sort-handle">
 									<span class="dashicons dashicons-arrow-up moveUp"></span>
 									<span class="dashicons dashicons-arrow-down moveDown"></span>
 								</span>
-                                <span class="dashicons dashicons-no item-remove" title="<?php esc_attr_e( 'Remove', 'breeze' ); ?>"></span>
+                                <span class="dashicons dashicons-no item-remove" title="<?php _e( 'Remove', 'breeze' ); ?>"></span>
                             </div>
 						<?php endif; ?>
                     </div>
                     <div style="margin: 10px 0">
                         <button type="button" class="br-blue-button-reverse add-url" id="add-move-to-footer-js">
-							<?php esc_html_e( 'Add URL', 'breeze' ); ?>
+							<?php _e( 'Add URL', 'breeze' ); ?>
                         </button>
                     </div>
                     <div class="br-note">
                         <p>
 							<?php
 
-							esc_html_e( 'Enter the complete URLs of JS files to be moved to the footer during minification process.', 'breeze' );
+							_e( 'Enter the complete URLs of JS files to be moved to the footer during minification process.', 'breeze' );
 							?>
                         </p>
                         <p class="br-important">
 							<?php
 							echo '<strong>';
-							esc_html_e( 'Important: ', 'breeze' );
+							_e( 'Important: ', 'breeze' );
 							echo '</strong>';
-							esc_html_e( 'You should add the URL of original files as URL of minified files are not supported.', 'breeze' );
+							_e( 'You should add the URL of original files as URL of minified files are not supported.', 'breeze' );
 							?>
                         </p>
 
@@ -1067,7 +709,7 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
             <div class="br-option-item">
                 <div class="br-label">
                     <div class="br-option-text">
-						<?php esc_html_e( 'JS Files With Deferred Loading', 'breeze' ); ?>
+						<?php _e( 'JS Files With Deferred Loading', 'breeze' ); ?>
                     </div>
                 </div>
                 <div class="br-option">
@@ -1079,13 +721,13 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
                                     <input type="text" size="98"
                                            class="breeze-input-url"
                                            name="defer-js[]"
-                                           placeholder="<?php esc_attr_e( 'Enter URL...', 'breeze' ); ?>"
+                                           placeholder="<?php _e( 'Enter URL...', 'breeze' ); ?>"
                                            value="<?php echo esc_html( $js_url ); ?>"/>
                                     <span class="sort-handle">
 										<span class="dashicons dashicons-arrow-up moveUp"></span>
 										<span class="dashicons dashicons-arrow-down moveDown"></span>
 									</span>
-                                    <span class="dashicons dashicons-no item-remove" title="<?php esc_attr_e( 'Remove', 'breeze' ); ?>"></span>
+                                    <span class="dashicons dashicons-no item-remove" title="<?php _e( 'Remove', 'breeze' ); ?>"></span>
                                 </div>
 							<?php endforeach; ?>
 						<?php else : ?>
@@ -1094,28 +736,28 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
                                        class="breeze-input-url"
                                        name="defer-js[]"
                                        id="defer-js"
-                                       placeholder="<?php esc_attr_e( 'Enter URL...', 'breeze' ); ?>"
+                                       placeholder="<?php _e( 'Enter URL...', 'breeze' ); ?>"
                                        value=""/>
                                 <span class="sort-handle">
 									<span class="dashicons dashicons-arrow-up moveUp"></span>
 									<span class="dashicons dashicons-arrow-down moveDown"></span>
 								</span>
-                                <span class="dashicons dashicons-no item-remove" title="<?php esc_attr_e( 'Remove', 'breeze' ); ?>"></span>
+                                <span class="dashicons dashicons-no item-remove" title="<?php _e( 'Remove', 'breeze' ); ?>"></span>
                             </div>
 						<?php endif; ?>
                     </div>
                     <div style="margin: 10px 0">
                         <button type="button" class="br-blue-button-reverse add-url" id="add-defer-js">
-							<?php esc_html_e( 'Add URL', 'breeze' ); ?>
+							<?php _e( 'Add URL', 'breeze' ); ?>
                         </button>
                     </div>
                     <div class="br-note">
                         <p class="br-important">
 							<?php
 							echo '<strong>';
-							esc_html_e( 'Important: ', 'breeze' );
+							_e( 'Important: ', 'breeze' );
 							echo '</strong>';
-							esc_html_e( 'You should add the URL of original files as URL of minified files are not supported.', 'breeze' );
+							_e( 'You should add the URL of original files as URL of minified files are not supported.', 'breeze' );
 							?>
                         </p>
                     </div>
@@ -1128,6 +770,6 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/file-active.png';
 
     </section>
     <div class="br-submit">
-        <input type="submit" value="<?php echo esc_attr__( 'Save Changes', 'breeze' ); ?>" class="br-submit-save"/>
+        <input type="submit" value="<?php echo __( 'Save Changes', 'breeze' ); ?>" class="br-submit-save"/>
     </div>
 </form>

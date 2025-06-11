@@ -1,7 +1,5 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+
 // General singleton class.
 class Breeze_Options_Reader {
 	// Hold the class instance.

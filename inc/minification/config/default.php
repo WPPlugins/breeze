@@ -1,7 +1,4 @@
-<?php
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+<?php exit;
 
 //Check everything exists before using it
 if ( ! isset( $_SERVER['HTTP_ACCEPT_ENCODING'] ) ) {
@@ -66,6 +63,5 @@ if ( ( $modTimeMatch ) || ( $eTagMatch ) ) {
 	header( 'Last-Modified: ' . gmdate( 'D, d M Y H:i:s', $modTime ) . ' GMT' );
 
 	// send output
-	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Cached/compressed file content cannot be escaped
 	echo $contents;
 }

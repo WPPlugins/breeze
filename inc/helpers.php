@@ -19,275 +19,21 @@
  */
 defined( 'ABSPATH' ) || die( 'No direct script access allowed!' );
 
-/**
- * Detect HTML Double-check selectors whose subject is a document root tag.
- *
- * `html`, `body`, and `head` (including `body.home` or `body#page`) cannot be
- * swapped by Double-check. Descendant targets such as `body .mini-cart` are allowed.
- *
- * @param string $selector CSS selector.
- * @return bool
- */
-function breeze_is_doublecheck_unsupported_root_selector( $selector ) {
-	$selector = trim( (string) $selector );
-	if ( '' === $selector ) {
-		return false;
-	}
-
-	$normalized = preg_replace( '/\s+/', ' ', $selector );
-	if ( ! is_string( $normalized ) || '' === $normalized ) {
-		return false;
-	}
-
-	$segments = preg_split( '/\s*(?:>|\+|~)\s*|\s+/', $normalized );
-	if ( ! is_array( $segments ) || empty( $segments ) ) {
-		return false;
-	}
-
-	$subject = trim( (string) end( $segments ) );
-	if ( '' === $subject ) {
-		return false;
-	}
-
-	$matches = array();
-	if ( 1 !== preg_match( '/^([A-Za-z][A-Za-z0-9_-]*)/', $subject, $matches ) ) {
-		return false;
-	}
-
-	$tag_name = strtolower( $matches[1] );
-
-	return in_array( $tag_name, array( 'html', 'body', 'head' ), true );
-}
-
-/**
- * Sanitize HTML Double-check selectors.
- *
- * Shared by File Options save and settings import so both enforce the same
- * size and pattern limits.
- *
- * @param array $selectors Selectors from textarea or imported JSON.
- * @return array{
- *     selectors: array,
- *     normalized_count: int,
- *     removed_count: int,
- *     removed_root_count: int
- * }
- */
-function breeze_sanitize_doublecheck_selectors( $selectors ) {
-	if ( is_string( $selectors ) ) {
-		$selectors = preg_split( '/\R/', $selectors );
-		if ( false === $selectors ) {
-			$selectors = array();
-		}
-	}
-
-	if ( ! is_array( $selectors ) ) {
-		return array(
-			'selectors'          => array(),
-			'normalized_count'   => 0,
-			'removed_count'      => 0,
-			'removed_root_count' => 0,
-		);
-	}
-
-	$sanitized_selectors = array();
-	$seen_selectors      = array();
-	$normalized_count    = 0;
-	$removed_count       = 0;
-	$removed_root_count  = 0;
-	$max_lines           = 200;
-	$max_line_length     = 150;
-
-	// Keep server-side limits strict so unusually large payloads are trimmed
-	// deterministically and do not grow processing time unexpectedly.
-	if ( count( $selectors ) > $max_lines ) {
-		$removed_count += count( $selectors ) - $max_lines;
-		$selectors      = array_slice( $selectors, 0, $max_lines );
-	}
-
-	foreach ( $selectors as $selector ) {
-		// Treat overlong selector lines as invalid input and drop them.
-		if ( strlen( (string) $selector ) > $max_line_length ) {
-			++$removed_count;
-			continue;
-		}
-
-		$normalized_data = breeze_normalize_doublecheck_selector( (string) $selector );
-
-		if ( true !== $normalized_data['is_valid'] ) {
-			++$removed_count;
-			continue;
-		}
-
-		if ( breeze_is_doublecheck_unsupported_root_selector( $normalized_data['selector'] ) ) {
-			++$removed_root_count;
-			continue;
-		}
-
-		if ( true === $normalized_data['was_corrected'] ) {
-			++$normalized_count;
-		}
-
-		// Preserve the first occurrence order while removing duplicates.
-		if ( isset( $seen_selectors[ $normalized_data['selector'] ] ) ) {
-			continue;
-		}
-
-		$seen_selectors[ $normalized_data['selector'] ] = true;
-		$sanitized_selectors[]                          = $normalized_data['selector'];
-	}
-
-	return array(
-		'selectors'          => $sanitized_selectors,
-		'normalized_count'   => $normalized_count,
-		'removed_count'      => $removed_count,
-		'removed_root_count' => $removed_root_count,
-	);
-}
-
-/**
- * Normalize a single HTML Double-check selector line.
- *
- * @param string $selector Raw selector.
- * @return array{
- *     selector: string,
- *     is_valid: bool,
- *     was_corrected: bool
- * }
- */
-function breeze_normalize_doublecheck_selector( $selector ) {
-	$raw_selector = trim( (string) $selector );
-	if ( '' === $raw_selector ) {
-		return array(
-			'selector'      => '',
-			'is_valid'      => false,
-			'was_corrected' => false,
-		);
-	}
-
-	// Normalize spacing so variants such as ".a>.b" and ".a > .b" are treated
-	// as the same selector pattern.
-	$normalized_selector = preg_replace( '/\s+/', ' ', $raw_selector );
-	if ( null === $normalized_selector ) {
-		$normalized_selector = $raw_selector;
-	}
-
-	$normalized_selector = preg_replace( '/\s*([>+~])\s*/', ' $1 ', $normalized_selector );
-	if ( null === $normalized_selector ) {
-		$normalized_selector = $raw_selector;
-	}
-
-	$normalized_selector = trim( preg_replace( '/\s+/', ' ', $normalized_selector ) );
-
-	// Allow chains composed of simple selector segments:
-	// - tag
-	// - #id
-	// - .class (including chained classes like ".a.b")
-	// - tag#id, tag.class, tag#id.class
-	// joined by descendant spaces or combinators (>, +, ~).
-	$selector_segment_pattern = '(?:[A-Za-z][A-Za-z0-9_-]*(?:#[A-Za-z0-9_-]+)?(?:\.[A-Za-z0-9_-]+)*|#[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*|\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)';
-	$selector_pattern         = '/^' . $selector_segment_pattern . '(?:\s(?:[>+~]\s)?' . $selector_segment_pattern . ')*$/';
-	if ( 1 !== preg_match( $selector_pattern, $normalized_selector ) ) {
-		return array(
-			'selector'      => '',
-			'is_valid'      => false,
-			'was_corrected' => false,
-		);
-	}
-
-	return array(
-		'selector'      => $normalized_selector,
-		'is_valid'      => true,
-		'was_corrected' => ( $normalized_selector !== $raw_selector ),
-	);
-}
-
-/**
- * Determine whether the current user is operating at the network scope.
- *
- * Returns true for Super Admins, users with `manage_network_options`, and
- * WP-CLI. Used to route multisite-wide Breeze actions to the correct scope
- * while site administrators continue to act on their own site.
- *
- * @return bool
- */
-function breeze_user_can_manage_network() {
-	if ( ! is_multisite() ) {
-		return false;
-	}
-
-	if ( defined( 'WP_CLI' ) && WP_CLI ) {
-		return true;
-	}
-
-	// User identity functions (`wp_get_current_user`, `is_super_admin`, etc.)
-	// are pluggable and only available once WordPress has loaded
-	// `wp-includes/pluggable.php`. A few Breeze callers initialise during the
-	// plugin-load phase before that file is included; when the user cannot yet
-	// be identified, default to the site scope. The user-aware request paths
-	// (admin-ajax, page renders, REST) all run after pluggable.php and are
-	// unaffected.
-	if ( ! function_exists( 'wp_get_current_user' ) ) {
-		return false;
-	}
-
-	// Capability check first — picks up environments where Network Admin
-	// privileges are granted via capabilities rather than membership in the
-	// `site_admins` list.
-	if ( current_user_can( 'manage_network_options' ) ) {
-		return true;
-	}
-
-	$user_id = get_current_user_id();
-	if ( empty( $user_id ) ) {
-		return false;
-	}
-
-	return is_super_admin( $user_id );
-}
-
-/**
- * Read the user-supplied `is-network` request flag.
- *
- * Returns the raw boolean intent of the request; callers MUST gate the
- * actual scope change with {@see breeze_user_can_manage_network()}.
- *
- * @return bool
- */
-function breeze_request_wants_network_scope() {
-	if ( ! isset( $_GET['is-network'] ) && ! isset( $_POST['is-network'] ) ) {
-		return false;
-	}
-
-	if ( isset( $_POST['is-network'] ) ) {
-		return filter_var( wp_unslash( $_POST['is-network'] ), FILTER_VALIDATE_BOOLEAN );
-	}
-
-	return filter_var( wp_unslash( $_GET['is-network'] ), FILTER_VALIDATE_BOOLEAN );
-}
-
-/**
- * Apply network-admin scope to the current request when the current user
- * is operating at the network level.
- *
- * Reads the `is-network` request flag as a strict boolean and only defines
- * `WP_NETWORK_ADMIN` when `is_multisite()` is true and the current user is
- * a Super Admin. For all other requests the hint is ignored and the caller
- * renders in site-local scope. Settings tabs continue to load for site
- * administrators; writes are scoped to the site via
- * {@see breeze_update_option()}.
- */
 function set_as_network_screen() {
-	if ( ! isset( $_GET['is-network'] ) && ! isset( $_POST['is-network'] ) ) {
-		return;
-	}
+	if ( isset( $_GET['is-network'] ) || isset( $_POST['is-network'] ) ) {
+		$is_network = false;
 
-	if ( true !== breeze_request_wants_network_scope() ) {
-		return;
-	}
+		if ( isset( $_GET['is-network'] ) ) {
+			$is_network = filter_var( $_GET['is-network'], FILTER_VALIDATE_BOOLEAN );
+		}
 
-	if ( breeze_user_can_manage_network() && ! defined( 'WP_NETWORK_ADMIN' ) ) {
-		define( 'WP_NETWORK_ADMIN', true );
+		if ( isset( $_POST['is-network'] ) ) {
+			$is_network = filter_var( $_POST['is-network'], FILTER_VALIDATE_BOOLEAN );
+		}
+
+		if ( true === $is_network && ! defined( 'WP_NETWORK_ADMIN' ) ) {
+			define( 'WP_NETWORK_ADMIN', true );
+		}
 	}
 }
 
@@ -304,10 +50,7 @@ function breeze_get_option( $option_name, $is_local = false ) {
 
 	global $breeze_network_subsite_settings;
 
-	// Reads are routed to the network option only on real Network Admin
-	// screens and when the current user is operating at the network scope;
-	// otherwise the site-local value is returned.
-	if ( is_network_admin() && ! $breeze_network_subsite_settings && breeze_user_can_manage_network() ) {
+	if ( is_network_admin() && ! $breeze_network_subsite_settings ) {
 		$is_local = false;
 	} elseif ( ! breeze_does_inherit_settings() ) {
 		$inherit = false;
@@ -327,22 +70,15 @@ function breeze_get_option( $option_name, $is_local = false ) {
 }
 
 /**
- * Update Breeze options at the appropriate scope on multisite.
- *
- * Writes use `update_site_option` only when the current user is a Super
- * Admin acting in the Network Admin context. All other requests use
- * `update_option` so each site's settings remain isolated.
+ * Update site options accounting for multisite.
  *
  * @param string $option_name
  * @param mixed  $value
  * @param bool   $is_local
  */
 function breeze_update_option( $option_name, $value, $is_local = false ) {
-	if ( is_network_admin() && breeze_user_can_manage_network() ) {
+	if ( is_network_admin() ) {
 		$is_local = false;
-	} else {
-		// Default to a site-local write for non-network requests.
-		$is_local = true;
 	}
 
 	if ( ! is_multisite() || $is_local ) {
@@ -388,12 +124,10 @@ function breeze_is_supported( $check ) {
 	return $return;
 }
 
-// Function to extract the base domain from a URL.
-// A TLD label may be 2–63 characters (RFC 1035), so new gTLDs such as .accountants match.
-// Two-part suffixes such as .co.uk are kept as part of the base domain.
+// Function to extract the base domain from a URL
 function breeze_get_base_domain( $domain ) {
 
-	if ( preg_match( '/(?P<domain>[a-z0-9][a-z0-9\-]{1,63}\.(?:[a-z]{2,3}\.[a-z]{2}|[a-z][a-z0-9\-]{1,62}))$/i', $domain, $regs ) ) {
+	if ( preg_match( '/(?P<domain>[a-z0-9][a-z0-9\-]{1,63}\.[a-z\.]{2,6})$/i', $domain, $regs ) ) {
 		return $regs['domain'];
 	}
 	return false;
@@ -422,7 +156,7 @@ function breeze_validate_urls( array $url_list = array(), bool $include_dns_chec
 		}
 
 		if ( false === strpos( $url, ':' ) ) {
-			$url = ( 0 === strpos( $url, '//' ) ? 'https:' : 'https://' ) . $url;
+			$url = 'https://' . $url;
 		}
 
 		$parsed_url = wp_parse_url( $url );
@@ -610,7 +344,7 @@ function breeze_validate_url_via_regexp( $url_to_be_checked = '' ) {
 	if ( empty( $url_to_be_checked ) ) {
 		return false;
 	}
-	$regex = '((http:|https:?)?\/\/)?([a-z0-9+!*(),;?&=.-]+(:[a-z0-9+!*(),;?&=.-]+)?@)?([a-z0-9\-\.]*)\.(([a-z][a-z0-9\-]{1,62})|([0-9]{1,3}\.([0-9]{1,3})\.([0-9]{1,3})))(:[0-9]{2,5})?(\/([a-z0-9+%-]\.?)+)*\/?(\?[a-z+&$_.-][a-z0-9;:@&%=+/.-/,/:]*)?(#[a-z_.-][a-z0-9+$%_.-]*)?';
+	$regex = '((http:|https:?)?\/\/)?([a-z0-9+!*(),;?&=.-]+(:[a-z0-9+!*(),;?&=.-]+)?@)?([a-z0-9\-\.]*)\.(([a-z]{2,6})|([0-9]{1,3}\.([0-9]{1,3})\.([0-9]{1,3})))(:[0-9]{2,5})?(\/([a-z0-9+%-]\.?)+)*\/?(\?[a-z+&$_.-][a-z0-9;:@&%=+/.-/,/:]*)?(#[a-z_.-][a-z0-9+$%_.-]*)?';
 
 	preg_match( "~^$regex$~i", $url_to_be_checked, $matches_found );
 
@@ -703,17 +437,16 @@ function breeze_file_match_pattern( $file_url, $pattern ) {
  * @return bool
  */
 function is_varnish_cache_started() {
-	$data = $_SERVER;
+
+	if ( isset( $_SERVER['HTTP_X_VARNISH'] ) && is_numeric( $_SERVER['HTTP_X_VARNISH'] ) ) {
+		return true;
+	}
 
 	// Return false early if varnish is disabled by the user.
 	if ( isset( $data['HTTP_X_APPLICATION'] )
 	&& ( 'varnishpass' === trim( $data['HTTP_X_APPLICATION'] ) || 'bypass' === trim( $data['HTTP_X_APPLICATION'] ) )
 	) {
 		return false;
-	}
-
-	if ( isset( $data['HTTP_X_VARNISH'] ) && is_numeric( $data['HTTP_X_VARNISH'] ) ) {
-		return true;
 	}
 
 	$check_local_server = is_varnish_layer_started();
@@ -818,183 +551,17 @@ function breeze_read_write_file( $file_path = '', $content = '' ) {
 		return false;
 	}
 
-	$wp_filesystem = breeze_get_filesystem();
-
-	return $wp_filesystem->put_contents( $file_path, $content );
-}
-
-/**
- * Thread-safe cache file write with proper locking.
- *
- * Writes to a temporary file with an exclusive lock, then performs an
- * atomic rename to the final cache path. This prevents partial writes
- * and race conditions under high concurrency.
- *
- * @param string $file_path      Full path to cache file.
- * @param string $data           Data to write.
- * @param int    $modified_time  Timestamp for file modification.
- * @param bool   $non_blocking   If true, skip if lock is busy instead of waiting.
- *
- * @return bool True on success, false on failure.
- */
-function breeze_safe_cache_write( $file_path, $data, $modified_time, $non_blocking = false ) {
-	if ( empty( $file_path ) ) {
-		return false;
-	}
-
-	// Unpredictable temp name + exclusive create ('xb') prevents symlink/TOCTOU
-	// attacks on shared hosts: an attacker can no longer pre-plant a symlink at
-	// the temp path to redirect our write to a sensitive file.
-	try {
-		$random_suffix = bin2hex( random_bytes( 8 ) );
-	} catch ( \Exception $e ) {
-		error_log( '[Breeze] Failed to generate random temp suffix: ' . $e->getMessage() );
-		return false;
-	}
-	$temp_file = $file_path . '.tmp.' . $random_suffix;
-
-	try {
-		// Open temp file for writing
-		$fp = fopen( $temp_file, 'xb' );
-		if ( false === $fp ) {
-			$last_error = error_get_last();
-			$message    = isset( $last_error['message'] ) ? ' Error: ' . $last_error['message'] : '';
-			error_log( '[Breeze] Failed to open temp file: ' . $temp_file . $message );
-
-			// "Disk full" is the most common cause of write failures in production.
-			// Log free space alongside the error so it's instantly visible in error_log.
-			$free_space = @disk_free_space( dirname( $temp_file ) );
-			if ( false !== $free_space ) {
-				error_log( '[Breeze] Free disk space: ' . round( $free_space / 1024 / 1024, 2 ) . ' MB' );
-			}
-
-			return false;
+	if (($handler = @fopen($file_path, 'w')) !== false) { // phpcs:ignore
+		if ((@fwrite($handler, $content)) !== false) { // phpcs:ignore
+			@fclose($handler); // phpcs:ignore
 		}
-
-		// Try to acquire lock
-		$lock_flags = LOCK_EX;
-		if ( $non_blocking ) {
-			$lock_flags |= LOCK_NB;  // Non-blocking flag
-		}
-
-		if ( ! flock( $fp, $lock_flags ) ) {
-			if ( $non_blocking ) {
-				// Lock is busy - skip this write
-				fclose( $fp );
-				@unlink( $temp_file );
-				return false;  // Not an error - just busy
-			} else {
-				// Blocking mode failed - this is an error
-				$last_error = error_get_last();
-				$message    = isset( $last_error['message'] ) ? ' Error: ' . $last_error['message'] : '';
-				error_log( '[Breeze] Failed to acquire lock: ' . $temp_file . $message );
-				fclose( $fp );
-				@unlink( $temp_file );
-				return false;
-			}
-		}
-
-		// Write data
-		$result = fwrite( $fp, $data );
-
-		// Release lock and close
-		flock( $fp, LOCK_UN );
-		fclose( $fp );
-
-		if ( false === $result ) {
-			$last_error = error_get_last();
-			$message    = isset( $last_error['message'] ) ? ' Error: ' . $last_error['message'] : '';
-			error_log( '[Breeze] Failed to write to temp file: ' . $temp_file . $message );
-			@unlink( $temp_file );
-			return false;
-		}
-
-		// Set modification time
-		if ( ! touch( $temp_file, $modified_time ) ) {
-			$last_error = error_get_last();
-			$message    = isset( $last_error['message'] ) ? ' Error: ' . $last_error['message'] : '';
-			error_log( '[Breeze] Failed to touch temp file: ' . $temp_file . $message );
-			@unlink( $temp_file );
-			return false;
-		}
-
-		// Atomic rename
-		if ( ! rename( $temp_file, $file_path ) ) {
-			$last_error = error_get_last();
-			$message    = isset( $last_error['message'] ) ? ' Error: ' . $last_error['message'] : '';
-			error_log( '[Breeze] Failed to rename temp file: ' . $temp_file . $message );
-			@unlink( $temp_file );
-			return false;
-		}
-
-		return true;
-
-	} catch ( \Exception $e ) {
-		error_log( '[Breeze] Exception writing cache: ' . $e->getMessage() );
-		if ( file_exists( $temp_file ) ) {
-			@unlink( $temp_file );
-		}
-		return false;
 	}
-}
-
-
-/**
- * Atomically replace a file.
- *
- * put_contents() truncates the live file and writes in place, so two overlapping
- * writers can leave the tail of the longer one behind the shorter one. The config
- * files are included on every request, so that leftover is a fatal error for the
- * whole install. Writing to a private temp file and renaming means a reader only
- * ever sees a complete file.
- *
- * @param string    $file_path Absolute path of the file to write.
- * @param string    $data      File contents.
- * @param int|false $mode      Permissions to apply, or false for FS_CHMOD_FILE.
- *
- * @return bool True on success, false on failure.
- */
-function breeze_atomic_write_file( $file_path, $data, $mode = false ) {
-	if ( empty( $file_path ) ) {
-		return false;
-	}
-
-	// Unguessable name + exclusive create ('xb') stops another process, or a
-	// pre-planted symlink on a shared host, from touching our temp file.
-	$temp_file = $file_path . '.' . uniqid( '', true ) . '.tmp';
-
-	$fp = @fopen( $temp_file, 'xb' );
-	if ( false === $fp ) {
-		return false;
-	}
-
-	$bytes_written = fwrite( $fp, $data );
-	fclose( $fp );
-
-	// A short write means the disk is full; renaming a truncated config into
-	// place would break every request.
-	if ( strlen( $data ) !== $bytes_written ) {
-		@unlink( $temp_file );
-
-		return false;
-	}
-
-	// rename() keeps the temp file's permissions, so apply them before the swap.
-	@chmod( $temp_file, $mode ? $mode : ( defined( 'FS_CHMOD_FILE' ) ? FS_CHMOD_FILE : 0644 ) );
-
-	if ( ! rename( $temp_file, $file_path ) ) {
-		@unlink( $temp_file );
-
-		return false;
-	}
-
-	return true;
 }
 
 
 function breeze_lock_cache_process( $path = '' ) {
 	$filename    = 'process.lock';
-	$create_lock = fopen( $path . $filename, 'xb' );
+	$create_lock = fopen( $path . $filename, 'w' );
 	if ( false === $create_lock ) {
 		return false;
 	}
@@ -1036,54 +603,6 @@ function multisite_blog_id_config() {
 }
 
 /**
- * Delete Breeze disk-cache folders for the given URLs.
- *
- * Cache keys are the raw request URL (e.g. https://example.com/store?page=3), so each URL
- * is also tried with/without a trailing slash and with its path percent-encoded in
- * lowercase and uppercase hex, as browsers send non-ASCII paths in either case.
- *
- * @param array  $urls            URLs to purge.
- * @param string $cache_base_path Breeze cache base path.
- *
- * @return void
- */
-function breeze_purge_local_cache_for_urls( array $urls, string $cache_base_path ) {
-	$wp_filesystem = breeze_get_filesystem();
-
-	foreach ( $urls as $url ) {
-		$candidates = array( $url );
-
-		// Do not trailingslashit query-string URLs (?page=2 would become ?page=2/).
-		if ( false === strpos( $url, '?' ) ) {
-			$candidates[] = trailingslashit( $url );
-			$candidates[] = untrailingslashit( $url );
-		}
-
-		foreach ( $candidates as $candidate ) {
-			// Only the path is encoded. parse_url() is not used: depending on locale it replaces some UTF-8 bytes with "_".
-			$parts = explode( '?', $candidate, 2 );
-			foreach ( array( 'strtolower', 'strtoupper' ) as $hex_case ) {
-				$parts[0]     = preg_replace_callback(
-					'/%[0-9A-Fa-f]{2}|[\x80-\xFF]/',
-					static function ( $match ) use ( $hex_case ) {
-						return $hex_case( '%' === $match[0][0] ? $match[0] : '%' . bin2hex( $match[0] ) );
-					},
-					$parts[0]
-				);
-				$candidates[] = implode( '?', $parts );
-			}
-		}
-
-		foreach ( array_unique( $candidates ) as $candidate ) {
-			$cache_path = $cache_base_path . hash( 'sha256', $candidate );
-			if ( $wp_filesystem->exists( $cache_path ) ) {
-				$wp_filesystem->rmdir( $cache_path, true );
-			}
-		}
-	}
-}
-
-/**
  * Purges the cache for a given URL.
  * Varnish cache and local cache.
  *
@@ -1094,9 +613,17 @@ function breeze_purge_local_cache_for_urls( array $urls, string $cache_base_path
  * @since 1.1.10
  */
 function breeze_varnish_purge_cache( $url = '', $purge_varnish = false, $check_varnish = true ) {
+	global $wp_filesystem;
+
+	// Making sure the filesystem is loaded.
+	if ( empty( $wp_filesystem ) ) {
+		require_once ABSPATH . '/wp-admin/includes/file.php';
+		WP_Filesystem();
+	}
+
 	// Clear the local cache using the product URL.
-	if ( ! empty( $url ) ) {
-		breeze_purge_local_cache_for_urls( array( $url ), breeze_get_cache_base_path() );
+	if ( ! empty( $url ) && $wp_filesystem->exists( breeze_get_cache_base_path() . hash( 'sha512', $url ) ) ) {
+		$wp_filesystem->rmdir( breeze_get_cache_base_path() . hash( 'sha512', $url ), true );
 	}
 
 	if ( false === $purge_varnish && true === $check_varnish ) {
@@ -1142,7 +669,15 @@ function breeze_varnish_purge_cache( $url = '', $purge_varnish = false, $check_v
 		$purgeme .= '?' . $parse_url['query'];
 	}
 
-	$ssl_verification = apply_filters( 'breeze_ssl_check_certificate', false );
+	$ssl_verification = apply_filters( 'breeze_ssl_check_certificate', true );
+
+	if ( ! is_bool( $ssl_verification ) ) {
+		$ssl_verification = true;
+	}
+
+	if ( defined( 'WP_DEBUG' ) && true === WP_DEBUG ) {
+		$ssl_verification = false;
+	}
 
 	$request_args = array(
 		'method'    => $purge_method,
@@ -1315,116 +850,4 @@ function breeze_helper_fetch_headers( int $time_fresh = 0 ) {
 	$headers = iterator_to_array( $request['headers'] );
 
 	return $headers;
-}
-
-/**
- * Helper function to get the WordPress Filesystem object.
- * Initializes the filesystem if it's not already set up.
- *
- * @return WP_Filesystem_Base The WordPress filesystem object.
- */
-function breeze_get_filesystem(): WP_Filesystem_Base {
-	global $wp_filesystem;
-
-	if ( empty( $wp_filesystem ) ) {
-		require_once ABSPATH . '/wp-admin/includes/file.php';
-		WP_Filesystem();
-	}
-
-	return $wp_filesystem;
-}
-
-/**
- * Blank index document written into cache directories to block directory listing.
- *
- * @return string
- */
-function breeze_get_cache_index_html(): string {
-	return '<html><head><meta name="robots" content="noindex, nofollow"></head><body></body></html>';
-}
-
-/**
- * Ensure a cache directory exists and contains index.html.
- *
- * @param string $dir Absolute directory path.
- * @return bool True when the directory exists and index.html is present.
- */
-function breeze_ensure_cache_index_html( string $dir ): bool {
-	if ( '' === $dir ) {
-		return false;
-	}
-
-	$dir = untrailingslashit( $dir );
-
-	if ( ! file_exists( $dir ) && ! wp_mkdir_p( $dir ) ) {
-		return false;
-	}
-
-	if ( ! is_writable( $dir ) ) {
-		return false;
-	}
-
-	$index_file = $dir . '/index.html';
-	if ( ! is_file( $index_file ) ) {
-		return (bool) breeze_read_write_file( $index_file, breeze_get_cache_index_html() );
-	}
-
-	return true;
-}
-
-/**
- * Apache rules that block script execution in a cache directory.
- *
- * @return string
- */
-function breeze_get_cache_htaccess_php_deny_rules(): string {
-	return <<<'HTACCESS'
-<IfModule mod_authz_core.c>
-	<FilesMatch "\.(?i:php|phtml|php3|php4|php5|php7|php8|phar|pht|phps)$">
-		Require all denied
-	</FilesMatch>
-</IfModule>
-<IfModule !mod_authz_core.c>
-	<FilesMatch "\.(?i:php|phtml|php3|php4|php5|php7|php8|phar|pht|phps)$">
-		Order deny,allow
-		Deny from all
-	</FilesMatch>
-</IfModule>
-HTACCESS;
-}
-
-/**
- * Write .htaccess with PHP-deny rules when missing.
- *
- * @param string $dir Absolute directory path.
- * @return bool
- */
-function breeze_ensure_cache_htaccess_php_deny( string $dir ): bool {
-	if ( '' === $dir ) {
-		return false;
-	}
-
-	$dir = untrailingslashit( $dir );
-
-	if ( ! file_exists( $dir ) && ! wp_mkdir_p( $dir ) ) {
-		return false;
-	}
-
-	$htaccess = $dir . '/.htaccess';
-	if ( is_file( $htaccess ) ) {
-		return true; // Do not overwrite minification's full template.
-	}
-
-	return (bool) breeze_read_write_file( $htaccess, breeze_get_cache_htaccess_php_deny_rules() );
-}
-
-/**
- * index.html + PHP-deny .htaccess for a cache directory.
- *
- * @param string $dir Absolute directory path.
- * @return bool
- */
-function breeze_secure_cache_directory( string $dir ): bool {
-	return breeze_ensure_cache_index_html( $dir )
-		&& breeze_ensure_cache_htaccess_php_deny( $dir );
 }

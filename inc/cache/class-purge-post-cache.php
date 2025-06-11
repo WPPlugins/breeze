@@ -3,9 +3,6 @@
  * This class handles the functionality of clearing the cache for
  * individual posts or pages.
  */
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
 class Purge_Post_Cache {
 
 	/**
@@ -50,10 +47,6 @@ class Purge_Post_Cache {
 	 * @return array Modified actions array with the 'Clear Cache' option.
 	 */
 	public function clear_cache_option( $actions, $post ) {
-		if ( ! current_user_can( 'edit_post', $post->ID ) ) {
-			return $actions;
-		}
-
 		$url         = $this->clear_cache_action_url( $post );
 		$clear_cache = array( 'clear-cache' => "<a href='$url'>Clear Cache</a>" );
 
@@ -83,6 +76,13 @@ class Purge_Post_Cache {
 
 		check_admin_referer( 'clear-cache-post_' . $post_id );
 
+		global $wp_filesystem;
+
+		if ( empty( $wp_filesystem ) ) {
+			require_once ABSPATH . '/wp-admin/includes/file.php';
+			WP_Filesystem();
+		}
+
 		$url_path = get_permalink( $post_id );
 
 		$the_blog_id = 0;
@@ -104,17 +104,12 @@ class Purge_Post_Cache {
 
 		$cache_base_path = breeze_get_cache_base_path( false, $the_blog_id );
 
-		breeze_purge_local_cache_for_urls( array( $url_path ), $cache_base_path );
+		if ( $wp_filesystem->exists( $cache_base_path . hash( 'sha512', $url_path ) ) ) {
+			$wp_filesystem->rmdir( $cache_base_path . hash( 'sha512', $url_path ), true );
+		}
 		// Clear the varnish cache.
 		do_action( 'breeze_clear_varnish' );
-
-		// Clear the object cache.
-		Breeze_PurgeCache::clear_op_cache_for_posts( $post_id );
-
-		// Clear the CF cache.
-		$post_related_urls = Breeze_PurgeCache::collect_urls_for_cache_purge( $post_id );
-		Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $post_related_urls );
-		wp_safe_redirect(
+		wp_redirect(
 			add_query_arg(
 				array(
 					'breeze_post_cache' => 'cleared',
@@ -122,6 +117,8 @@ class Purge_Post_Cache {
 				$this->sendback_url( $post_id )
 			)
 		);
+
+		Breeze_PurgeCache::clear_op_cache_for_posts($post_id);
 		exit;
 	}
 

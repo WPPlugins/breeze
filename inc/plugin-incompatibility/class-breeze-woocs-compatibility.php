@@ -5,9 +5,6 @@
  * Date: 16.06.2022
  * Time: 17:37
  */
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
 
 class Breeze_Woocs_Compatibility {
 
@@ -19,16 +16,7 @@ class Breeze_Woocs_Compatibility {
 		add_action( 'wp_footer', array( &$this, 'implement_extra_js' ) );
 	}
 
-
-
 	public function breeze_woocs_fetch_currency() {
-		if ( ! wp_verify_nonce( $_POST['nonce'], 'breeze_woocs_nonce' ) ) {
-			wp_send_json_error( 'Invalid security token' );
-
-			return;
-		}
-
-		// phpcs:ignore WordPress.NamingConventions.ValidVariableName.VariableNotSnakeCase
 		global $WOOCS;
 
 		if ( ! class_exists( 'WooCommerce' ) ) {
@@ -38,7 +26,8 @@ class Breeze_Woocs_Compatibility {
 		if ( ! class_exists( 'WOOCS_STARTER' ) ) {
 			return;
 		}
-		// phpcs:ignore WordPress.NamingConventions.ValidVariableName.VariableNotSnakeCase
+
+
 		wp_send_json_success( $WOOCS->get_woocommerce_currency() );
 	}
 
@@ -51,9 +40,7 @@ class Breeze_Woocs_Compatibility {
 		}
 
 		$ajax_url = admin_url( 'admin-ajax.php' );
-		$nonce    = wp_create_nonce( 'breeze_woocs_nonce' );
-
-		$data = <<<AJAX_REQUEST
+		$data     = <<<AJAX_REQUEST
  
 function breeze_xhr_request(url, action, data) {
     let request = new XMLHttpRequest();
@@ -76,14 +63,15 @@ function breeze_xhr_request(url, action, data) {
     }
     request.onerror = function() {
     }
-    request.send('action=' + action + data + '&nonce={$nonce}');
+    request.send('action=' + action + data);
 }
  var breeze_ajax_url = "{$ajax_url}";
 breeze_xhr_request(breeze_ajax_url, 'breeze_woocs_currency_get', '');
-
+ 
 AJAX_REQUEST;
 
 		wp_add_inline_script( 'woocommerce-currency-switcher', $data, 'after' );
+
 	}
 }
 

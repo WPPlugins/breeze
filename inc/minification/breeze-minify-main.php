@@ -18,9 +18,6 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
-
-use function Breeze_Cache_Init\double_check_append_script;
-
 defined( 'ABSPATH' ) || die( 'No direct script access allowed!' );
 
 class Breeze_Minify {
@@ -51,7 +48,6 @@ class Breeze_Minify {
 
 					if (
 						! empty( Breeze_Options_Reader::get_option_value( 'breeze-minify-html' ) ) ||
-						! empty( Breeze_Options_Reader::get_option_value( 'breeze-html-doublecheck' ) ) ||
 						! empty( Breeze_Options_Reader::get_option_value( 'breeze-minify-css' ) ) ||
 						! empty( Breeze_Options_Reader::get_option_value( 'breeze-minify-js' ) ) ||
 						! empty( Breeze_Options_Reader::get_option_value( 'breeze-defer-js' ) ) ||
@@ -76,18 +72,10 @@ class Breeze_Minify {
 
 	/**
 	 * Check whether to execute caching functions or not.
-	 * Will not execute for non-GET requests, purge cache, or heartbeat actions.
+	 * Will not execute for purge cache or heartbeat actions.
 	 */
 	public static function should_cache() {
-		if (
-			( isset( $_SERVER['REQUEST_METHOD'] ) && 'GET' !== $_SERVER['REQUEST_METHOD'] ) ||
-			isset( $_GET['breeze_purge_cloudflare'] ) ||
-			isset( $_GET['breeze_purge'] ) ||
-			(
-				isset( $_POST['action'] ) &&
-				'heartbeat' === $_POST['action']
-			)
-		) {
+		if ( isset( $_GET['breeze_purge_cloudflare'] ) || isset( $_GET['breeze_purge'] ) || ( isset( $_POST['action'] ) && 'heartbeat' === $_POST['action'] ) ) {
 			return false;
 		}
 
@@ -98,12 +86,6 @@ class Breeze_Minify {
 	 * Start buffer
 	 */
 	public function breeze_start_buffering() {
-		// CRITICAL: Skip minification if circuit breaker is open (cache system is failing)
-		// When cache is bypassed due to failures, we don't want to add minification overhead
-		if ( ! empty( $GLOBALS['breeze_bypass_cache'] ) ) {
-			return; // Circuit breaker open - skip all minification
-		}
-
 		$ao_noptimize = false;
 
 		// check for DONOTMINIFY constant as used by e.g. WooCommerce POS
@@ -151,11 +133,7 @@ class Breeze_Minify {
 				)
 			) {
 				// If we have defer scripts to handle, load only the script for this action.
-				include_once BREEZE_PLUGIN_DIR . 'inc/minification/breeze-js-deferred-loading.php';
-			}
-
-			if ( ! empty( Breeze_Options_Reader::get_option_value( 'breeze-html-doublecheck' ) ) ) {
-				include_once BREEZE_PLUGIN_DIR . 'inc/helpers/class-breeze-doublecheck.php';
+				include_once( BREEZE_PLUGIN_DIR . 'inc/minification/breeze-js-deferred-loading.php' );
 			}
 
 			if ( ! empty( Breeze_Options_Reader::get_option_value( 'breeze-minify-css' ) ) ) {
@@ -188,7 +166,7 @@ class Breeze_Minify {
 
 	public function breeze_end_buffering( $content ) {
 
-		if ( empty( $content ) || stripos( $content, '<html' ) === false || stripos( $content, '<html amp' ) !== false || stripos( $content, '<html ⚡' ) !== false || stripos( $content, '<xsl:stylesheet' ) !== false ) {
+		if ( stripos( $content, '<html' ) === false || stripos( $content, '<html amp' ) !== false || stripos( $content, '<html ⚡' ) !== false || stripos( $content, '<xsl:stylesheet' ) !== false ) {
 			return $content;
 		}
 		// load URL constants as late as possible to allow domain mapper to kick in
@@ -263,8 +241,6 @@ class Breeze_Minify {
 		$breeze_delay_all_js = filter_var( Breeze_Options_Reader::get_option_value( 'breeze-delay-all-js' ), FILTER_VALIDATE_BOOLEAN );
 		$script_delay        = Breeze_Options_Reader::get_option_value( 'breeze-delay-js-scripts' );
 		$is_inline_delay_on  = filter_var( Breeze_Options_Reader::get_option_value( 'breeze-enable-js-delay' ), FILTER_VALIDATE_BOOLEAN );
-		$breeze_minified_css_hashes = isset( get_option( 'breeze_minified_hashes' )['css'] ) ? get_option( 'breeze_minified_hashes' )['css'] : array();
-		$breeze_minified_js_hashes	= isset( get_option( 'breeze_minified_hashes' )['js'] ) ? get_option( 'breeze_minified_hashes' )['js'] : array();
 		$classoptions        = array(
 			'Breeze_MinificationScripts' => array(
 				'justhead'           => false,
@@ -281,7 +257,6 @@ class Breeze_Minify {
 				'no_delay_js'        => ( ! empty( $no_script_delay ) ? $no_script_delay : array() ),
 				'delay_javascript'   => $breeze_delay_all_js,
 				'is_inline_delay_on' => $is_inline_delay_on,
-				'breeze_minified_js_hashes' => $breeze_minified_js_hashes,
 			),
 			'Breeze_MinificationStyles'  => array(
 				'justhead'             => false,
@@ -297,19 +272,18 @@ class Breeze_Minify {
 				'groupcss'             => $groupcss,
 				'custom_css_exclude'   => Breeze_Options_Reader::get_option_value( 'breeze-exclude-css' ),
 				'include_imported_css' => false,
-				'breeze_minified_css_hashes' => $breeze_minified_css_hashes,
 			),
 			'Breeze_MinificationHtml'    => array(
 				'keepcomments' => false,
 			),
 			'Breeze_Js_Deferred_Loading' => array(
-				'move_to_footer_js'  		=> Breeze_Options_Reader::get_option_value( 'breeze-move-to-footer-js' ),
-				'defer_js'           		=> Breeze_Options_Reader::get_option_value( 'breeze-defer-js' ),
-				'delay_inline_js'    		=> ( ! empty( $script_delay ) ? $script_delay : array() ),
-				'no_delay_js'        		=> ( ! empty( $no_script_delay ) ? $no_script_delay : array() ),
-				'cdn_url'            		=> $cdn_url,
-				'delay_javascript'   		=> $breeze_delay_all_js,
-				'is_inline_delay_on' 		=> $is_inline_delay_on,
+				'move_to_footer_js'  => Breeze_Options_Reader::get_option_value( 'breeze-move-to-footer-js' ),
+				'defer_js'           => Breeze_Options_Reader::get_option_value( 'breeze-defer-js' ),
+				'delay_inline_js'    => ( ! empty( $script_delay ) ? $script_delay : array() ),
+				'no_delay_js'        => ( ! empty( $no_script_delay ) ? $no_script_delay : array() ),
+				'cdn_url'            => $cdn_url,
+				'delay_javascript'   => $breeze_delay_all_js,
+				'is_inline_delay_on' => $is_inline_delay_on,
 			),
 		);
 
@@ -370,187 +344,7 @@ class Breeze_Minify {
 			$content = apply_filters( 'breeze_html_after_minify', $content );
 		}
 
-		// Double-check refreshes parts of a cached page. Skip it when this
-		// request is not cacheable, or when full-page HTML cache is off.
-		// A missing HTML-cache key stays on, matching the cache writer.
-		$html_cache_enabled = true === filter_var(
-			Breeze_Options_Reader::get_option_value( 'breeze-enable-html-cache' ) ?? '1',
-			FILTER_VALIDATE_BOOLEAN
-		);
-
-		if ( $html_cache_enabled && true === $is_caching_on && ! empty( Breeze_Options_Reader::get_option_value( 'breeze-html-doublecheck' ) ) ) {
-			$content = $this->double_check_append_script( $content );
-		}
-
 		return $content;
-	}
-
-	private function double_check_append_script( $buffer ) {
-		// Skip Double-check script injection for crawlers/bots.
-		if ( $this->is_doublecheck_bot_request() ) {
-			return $buffer;
-		}
-
-		$host   = ( isset( $_SERVER['HTTP_HOST'] ) ) ? $_SERVER['HTTP_HOST'] : '';
-		$domain = ( ( ( ! empty( $_SERVER['HTTPS'] ) && 'off' !== $_SERVER['HTTPS'] ) || ( ! empty( $_SERVER['SERVER_PORT'] ) && 443 == $_SERVER['SERVER_PORT'] ) ) ? 'https://' : 'http://' );
-		if ( empty( $host ) ) {
-			$host = '';
-		}
-		$breeze_current_url_path = $domain . rtrim( $host, '/' ) . $_SERVER['REQUEST_URI'];
-		// Make the doublecheck if enabled.
-		if ( class_exists( 'Breeze_Doublecheck' ) ) {
-			if ( isset( $GLOBALS['breeze_config'] ) ) {
-				$breeze_config = $GLOBALS['breeze_config'];
-				// Verify that 'breeze-doublecheck-elements' is set and is an array
-				$elements = $breeze_config['cache_options']['breeze-doublecheck-elements'] ?? array();
-				// Verify that 'breeze-html-doublecheck' is a valid boolean.
-				$is_dc_enabled  = filter_var( Breeze_Options_Reader::get_option_value( 'breeze-html-doublecheck' ), FILTER_VALIDATE_BOOLEAN );
-				$dc_url_exclude = Breeze_Options_Reader::get_option_value( 'breeze-doublecheck-exclude-url' );
-
-				if ( empty( $dc_url_exclude ) || ! is_array( $dc_url_exclude ) ) {
-					$dc_url_exclude = array();
-				}
-
-				$is_dc_url_excluded = $this->is_doublecheck_excluded_url( $breeze_current_url_path, $dc_url_exclude );
-				$is_dc_refresh      = isset( $_GET['nocache'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-				if ( $is_dc_enabled && ! empty( $elements ) && ! $is_dc_url_excluded && ! $is_dc_refresh ) {
-					$dc_exec = new \Breeze_Doublecheck();
-					$buffer  = $dc_exec->init( $buffer );
-
-					return $buffer;
-				}
-			}
-		}
-		return $buffer;
-	}
-
-	/**
-	 * Detect common crawler/bot user agents.
-	 *
-	 * @return bool
-	 */
-	private function is_doublecheck_bot_request() {
-		return function_exists( 'breeze_request_is_doublecheck_bot' ) && breeze_request_is_doublecheck_bot();
-	}
-
-	/**
-	 * Check whether current URL is excluded from HTML Double-check.
-	 *
-	 * Normalization rules:
-	 * - Compare by lowercase host + normalized path for absolute URLs.
-	 * - Compare by normalized path for relative URLs.
-	 * - Ignore query strings and fragments.
-	 *
-	 * @param string $current_url Current request URL.
-	 * @param array  $exclude_urls Excluded URLs from settings.
-	 * @return bool
-	 */
-	private function is_doublecheck_excluded_url( $current_url, $exclude_urls ) {
-		if ( empty( $exclude_urls ) || ! is_array( $exclude_urls ) ) {
-			return false;
-		}
-
-		$current_normalized = $this->normalize_doublecheck_compare_url( $current_url );
-		if ( empty( $current_normalized ) ) {
-			return false;
-		}
-
-		foreach ( $exclude_urls as $exclude_url ) {
-			$exclude_normalized = $this->normalize_doublecheck_compare_url( $exclude_url );
-			if ( empty( $exclude_normalized ) ) {
-				continue;
-			}
-
-			// Relative exclusions match path only.
-			if ( isset( $exclude_normalized['type'] ) && 'path' === $exclude_normalized['type'] ) {
-				if (
-					isset( $exclude_normalized['path'], $current_normalized['path'] ) &&
-					$exclude_normalized['path'] === $current_normalized['path']
-				) {
-					return true;
-				}
-				continue;
-			}
-
-			// Absolute exclusions match host + path.
-			if (
-				isset( $exclude_normalized['host'], $exclude_normalized['path'], $current_normalized['host'], $current_normalized['path'] ) &&
-				$exclude_normalized['host'] === $current_normalized['host'] &&
-				$exclude_normalized['path'] === $current_normalized['path']
-			) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Normalize URL/path for HTML Double-check exclusion comparison.
-	 *
-	 * @param string $url URL or relative path.
-	 * @return array
-	 */
-	private function normalize_doublecheck_compare_url( $url ) {
-		$url = trim( (string) $url );
-		if ( '' === $url ) {
-			return array();
-		}
-
-		// Relative path exclusions are compared only by normalized path.
-		if ( 0 === strpos( $url, '/' ) ) {
-			return array(
-				'type' => 'path',
-				'path' => $this->normalize_doublecheck_path( $url ),
-			);
-		}
-
-		$parsed = wp_parse_url( $url );
-		if ( ! is_array( $parsed ) || empty( $parsed['host'] ) ) {
-			return array();
-		}
-
-		$path = isset( $parsed['path'] ) ? $parsed['path'] : '/';
-
-		return array(
-			'type' => 'absolute',
-			'host' => strtolower( (string) $parsed['host'] ),
-			'path' => $this->normalize_doublecheck_path( $path ),
-		);
-	}
-
-	/**
-	 * Normalize URL path for deterministic comparison.
-	 *
-	 * @param string $path Raw path or URL-like path.
-	 * @return string
-	 */
-	private function normalize_doublecheck_path( $path ) {
-		$path = (string) $path;
-
-		// Ensure we compare only path, never query/fragment.
-		$path = explode( '?', $path, 2 )[0];
-		$path = explode( '#', $path, 2 )[0];
-		$path = trim( $path );
-		if ( '' === $path ) {
-			return '/';
-		}
-
-		if ( '/' !== $path[0] ) {
-			$path = '/' . $path;
-		}
-
-		$path = preg_replace( '#/{2,}#', '/', $path );
-		if ( null === $path ) {
-			$path = '/';
-		}
-
-		$path = rtrim( $path, '/' );
-		if ( '' === $path ) {
-			return '/';
-		}
-
-		return $path;
 	}
 
 	/*
