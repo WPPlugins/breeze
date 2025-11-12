@@ -1112,6 +1112,9 @@ INLINEJS;
 
 				// Delete transients.
 				delete_transient( 'breeze_custom_varnish_server_active' );
+
+				// Delete Minfication hashes.
+				delete_option( 'breeze_minified_hashes' );
 			}
 		}
 	}
