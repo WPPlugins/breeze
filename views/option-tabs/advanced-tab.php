@@ -317,19 +317,21 @@ $icon = BREEZE_PLUGIN_URL . 'assets/images/advanced-active.png';
 				<div>
 					<input type="text" id="breeze-api-token" name="breeze-api-token"
 							placeholder="5a1404a010241e0b79aecb67581009d5"
-							value="<?php echo $api_token_output; ?>"/>
+							value="<?php echo $api_token_output; ?>" readonly/>
 					<a id="refresh-api-token" title="<?php esc_attr_e( 'Refresh Token', 'breeze' ); ?>">
 						<span class="dashicons dashicons-update"></span>
 					</a>
-					<a style="display: inline-block;color: #11ACDF;  margin-left: 15px;" id="copy-api-token"
+					<a style="display: inline-block;color: #11ACDF;  margin-left: 15px;cursor:pointer;" id="copy-api-token"
 						title="<?php esc_attr_e( 'Copy Token', 'breeze' ); ?>">
 						<span style="font-size: 22px;" class="dashicons dashicons-clipboard"></span>
 					</a>
+
+					<div id="breeze-password-strength-meter" style="display:none; margin-top: 5px; padding: 5px; font-weight: bold;"></div>
+					<div id="breeze-password-hint" style="display:none; color: #d63638; font-size: 12px; margin-top: 5px;"></div>
 				</div>
 				<div class="br-note">
 
 				</div>
-
 
 			</div>
 		</div>
