@@ -2,9 +2,9 @@
 Contributors: Cloudways
 Tags: cache,caching, performance, wp-cache, cdn
 Requires at least: 6.0
-Tested up to: 7.1
+Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.6.5
+Stable tag: 2.5.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -38,7 +38,9 @@ What makes Breeze Cache Plugin awesome is that it comes with builtin support for
 * Master real-time interactions with Breeze's Heartbeat API management. Fine-tune notifications, sales data, autosaves, and more to optimize WordPress website performance by adjusting API call frequencies.
 * Effortlessly manage Breeze settings using Import/Export. Download your configurations as a .json file for backup, or effortlessly import existing settings to quickly fine-tune your optimization.
 
+
 **Support:** We love to provide support! Post your questions on the WordPress.org support forums, or if you are a Cloudways Customer you may ask questions on the <a href="https://community.cloudways.com/">Cloudways Community Forum</a>.
+
 
 == Installation ==
 
@@ -48,7 +50,7 @@ What makes Breeze Cache Plugin awesome is that it comes with builtin support for
 * Click install and wait for the installation to finish. Next, click the activate link
 
 = To install the plugin manually: =
-* Download and unzip the plugin package - breeze.zip
+* Download and unzip the plugin package - breeze.1.0.0.zip
 * Upload the breeze to /wp-content/plugins/
 * Activate the plugin through the 'Plugins' menu in WordPress Dashboard
 * Access Breeze from WordPress Admin > Settings > Breeze
@@ -150,7 +152,7 @@ No, Breeze does not support Push CDN. However, you could use Breeze with Push CD
 
 = Does Breeze Work With CloudFlare? =
 
-Yes. The process of setting up CloudFlare with Breeze is easy. Check out the following <a href="https://support.cloudways.com/can-i-use-cloudflare-cdn/" target="_blank">KnowledgeBase article</a> for details. 
+Yes. The process of setting up CloudFlare with Breeze is easy. Check out the following <a href="https://support.cloudways.com/can-i-use-cloudflare-cdn/" target="_blank">KnowledgeBase article</a> for details.
 
 = How Breeze cache uses Gzip? =
 
@@ -158,57 +160,26 @@ Using Gzip, Breeze compresses the request files, further reducing the size of th
 
 == Changelog ==
 
-= 2.6.5 =
+= 2.5.2 =
 
-* Improvement: Fixed more Plugin Check warnings to meet WordPress.org plugin standards.
-* Fix: Tracking parameters such as utm_source, gclid, and fbclid are now kept when WordPress redirects a page, for example when it adds a trailing slash.
-* Fix: Cache Warmup now finishes warming your URLs after a cache purge, even when no one has wp-admin open.
-* Fix: CSS and JS from shortcut themes and plugins are minified again.
-* Fix: Option names on the Database tab are now shown as plain text.
-* Fix: The loading overlay color is now used only when it is a normal hex color.
+* Improved: Refined multisite handling across settings, cache management, import/export, and reset actions for more consistent behavior and better scope control.
+* Improved: Enhanced cache handling and validation for more reliable content delivery and request processing.
 
-= 2.6.4 =
+= 2.5.1 =
 
-* New: The Breeze settings page now shows a short review request that you can postpone or dismiss.
-* Improvement: Visitors arriving from Google Ads links (with tracking parameters such as gclid) now get the cached page.
-* Improvement: Fixed Plugin Check warnings to meet WordPress.org plugin standards.
-* Fix: DNS Prefetch no longer marks addresses that start with "//", such as //fonts.googleapis.com, as invalid.
-* Fix: Automatic plugin updates no longer stop after the first plugin when several plugins update at once on sites using Redis or Object Cache Pro.
+* Fix: Images no longer fail to load when the "Lazy load" option is enabled. The bundled lazy-load library file was empty in 2.5.0 and has been restored.
 
-= 2.6.3 =
+= 2.5.0 =
 
-* Fix: Extra link parameters can no longer be used to store the wrong page in the cache.
-* Fix: Switching tabs in Breeze settings no longer shows the text “no-issue”.
-* Fix: Logging out now clears Breeze’s login cookie on sites installed in a subfolder.
-* Fix: Unpublishing a post now removes the cached page visitors were seeing.
-* Fix: Saving a post with a non-English address, such as Hebrew, now clears that page’s cache.
+* Fix: DNS Prefetch no longer chops off the first letter of domain names.
+* New: Smart Cache Protection automatically pauses caching when errors are detected, keeping your site responsive.
+* Improvement: Minification is paused while Smart Cache Protection is active to save resources.
+* Improvement: Minification now skips form submissions and other non-page requests, making your site lighter and faster.
+* Fix: Cache files are now written safely, preventing corruption under heavy traffic.
+* Improvement: Cache error logs now include the page URL and free disk space for easier troubleshooting.
+* New: Added 304 Not Modified support. Returning visitors get an instant response instead of re-downloading unchanged pages, saving bandwidth.
+* Improvement: Faster cache lookups using a shorter, quicker key for cached page filenames.
 
-= 2.6.2 =
-
-* Improvement: Activating or deactivating a plugin in Network Admin is now faster when Preload URLs is off.
-* Improvement: On Multisite, each site now saves the new Breeze version after an update, so the update routine doesn’t run again.
-* Improvement: Uninstalling Breeze now removes leftover update data.
-* Fix: Pages excluded by Never Cache are no longer cached, and links with extra parameters (such as tracking codes) still open the correct page.
-* Fix: Locally hosted Google Fonts now load correctly.
-* Fix: Refresh cached page parts now updates the correct section when a page contains several similar elements.
-* Fix: Updating a post through WP-CLI or a scheduled task now clears that post’s cache.
-* Fix: Turning Varnish off in Breeze now keeps it off.
-* Fix: Removed an “Array to string conversion” warning in the PHP error log after a visitor leaves a comment.
-
-= 2.6.1 =
-
-* Fix: Resolved high server load and slow or timed-out pages right after updating Breeze (mostly Multisite).
-
-= 2.6.0 =
-
-* New: Cache Full Page HTML is now a separate option.
-* New: Added Refresh cached page parts (beta). After a cached page loads, selected parts can be refreshed so they stay up to date. Off by default.
-* Fix: Resolved a PHP fatal error on sites using the FooEvents plugin.
-* Fix: Fixed minified CSS/JS being stored in the wrong folder for logged-in users.
-* Fix: Removed duplicate cache-purge requests when updating a post.
-* Fixed: "Never Cache URL(s)" no longer shows an invalid URL warning for domains with long TLD endings.
-* Improvement: Breeze now updates its config file in place instead of deleting and recreating it.
-* Improvement: Breeze no longer removes locally hosted Google/Facebook files during updates.
 
 [See changelog for all versions](https://plugins.svn.wordpress.org/breeze/trunk/changelog.txt)
 

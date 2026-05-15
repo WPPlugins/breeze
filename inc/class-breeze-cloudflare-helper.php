@@ -15,7 +15,6 @@ final class Breeze_CloudFlare_Helper {
 
 	private $cw_platform = '';
 	private static $processed_home_urls = array();
-	private static $processed_home_url_responses = array();
 
 	function __construct() {
 		add_action( 'switch_theme', array( &$this, 'clear_cf_on_changing_theme' ), 11, 3 );
@@ -34,13 +33,12 @@ final class Breeze_CloudFlare_Helper {
 			return false;
 		}
 		$fpc_microservice_url = ''; // default
-		$fpc_env_url          = getenv( 'FPC_ENV' );
 		/**
 		 * Contains the dynamic microservice URL.
 		 */
-		if ( true === self::is_fp_server() && ! empty( $fpc_env_url ) ) {
+		if ( true === self::is_fp_server() ) {
 			$this->cw_platform    = 'fp';
-			$fpc_microservice_url = $fpc_env_url; // TODO Add the hardcoded link for Flexible (stating|production).
+			$fpc_microservice_url = getenv( 'FPC_ENV' ); // TODO Add the hardcoded link for Flexible (stating|production).
 
 			if ( true === self::is_log_enabled() ) {
 				$server_type_text = '';
@@ -54,33 +52,11 @@ final class Breeze_CloudFlare_Helper {
 
 				error_log( 'Cloudways FP (Flexible) is ON: ' . $server_type_text );
 			}
-		} elseif ( ! empty( $fpc_env_url ) ) {
+		} elseif ( ! empty( getenv( 'FPC_ENV' ) ) ) {
 			$this->cw_platform    = 'fmp';
-			$fpc_microservice_url = $fpc_env_url;// FMP
+			$fpc_microservice_url = getenv( 'FPC_ENV' );// FMP
 			if ( true === self::is_log_enabled() ) {
 				error_log( 'Cloudways FMP (Autoscale) is ON ' );
-			}
-		}
-
-		/*
-		 * Persist the purge API URL/platform from normal requests so cron requests can
-		 * still purge when environment variables are not available in that context.
-		 */
-		if ( ! empty( $fpc_microservice_url ) ) {
-			update_option( 'breeze_cf_microservice_url', $fpc_microservice_url );
-			update_option( 'breeze_cf_platform', $this->cw_platform );
-		} else {
-			$cached_microservice_url = get_option( 'breeze_cf_microservice_url', '' );
-			$cached_platform         = get_option( 'breeze_cf_platform', '' );
-
-			if ( ! empty( $cached_microservice_url ) ) {
-				$fpc_microservice_url = $cached_microservice_url;
-
-				if ( in_array( $cached_platform, array( 'fp', 'fmp' ), true ) ) {
-					$this->cw_platform = $cached_platform;
-				} else {
-					$this->cw_platform = 'fp';
-				}
 			}
 		}
 
@@ -93,27 +69,6 @@ final class Breeze_CloudFlare_Helper {
 		}
 
 		return trailingslashit( $fpc_microservice_url );
-	}
-
-	/**
-	 * Warm up Cloudflare microservice options if they are missing.
-	 *
-	 * @return void
-	 */
-	public static function maybe_warmup_microservice_options(): void {
-		if ( false === self::is_cloudflare_enabled() ) {
-			return;
-		}
-
-		$cached_microservice_url = get_option( 'breeze_cf_microservice_url', '' );
-		$cached_platform         = get_option( 'breeze_cf_platform', '' );
-
-		if ( ! empty( $cached_microservice_url ) && in_array( $cached_platform, array( 'fp', 'fmp' ), true ) ) {
-			return;
-		}
-
-		$helper = new self();
-		$helper->get_microservice_url();
 	}
 
 	/**
@@ -198,10 +153,6 @@ final class Breeze_CloudFlare_Helper {
 
 		$home_url_key = hash( 'sha256', serialize( $home_url ) );
 		if ( isset( self::$processed_home_urls[ $home_url_key ] ) ) {
-			if ( isset( self::$processed_home_url_responses[ $home_url_key ] ) ) {
-				return self::$processed_home_url_responses[ $home_url_key ];
-			}
-
 			return true;
 		}
 
@@ -248,10 +199,8 @@ final class Breeze_CloudFlare_Helper {
 		}
 
 		self::$processed_home_urls[ $home_url_key ] = true;
-		$response_code                              = $breeze_helper->request_cache_reset( $home_url, $purge_request_endpoint );
-		self::$processed_home_url_responses[ $home_url_key ] = $response_code;
 
-		return $response_code;
+		return $breeze_helper->request_cache_reset( $home_url, $purge_request_endpoint );
 	}
 
 	/**
@@ -396,9 +345,7 @@ final class Breeze_CloudFlare_Helper {
 			$return_value = false;
 		}
 
-		$is_cloudways_server = self::is_cloudways_server();
-
-		if ( false === $is_cloudways_server ) {
+		if ( false === self::is_cloudways_server() ) {
 			$return_value = false;
 		}
 
@@ -413,13 +360,11 @@ final class Breeze_CloudFlare_Helper {
 	 * @since 2.0.19
 	 */
 	public static function is_cloudways_server(): bool {
-		$has_cloudflare_constants = defined( 'CDN_SITE_ID' ) && defined( 'CDN_SITE_TOKEN' );
 
 		if (
 			false !== strpos( $_SERVER['DOCUMENT_ROOT'], 'cloudwaysapps' ) ||
 			false !== strpos( $_SERVER['DOCUMENT_ROOT'], 'cloudwaysstagingapps' ) ||
-			! empty( getenv( 'FPC_ENV' ) ) ||
-			$has_cloudflare_constants
+			! empty( getenv( 'FPC_ENV' ) )
 		) {
 			return true;
 		}
@@ -569,18 +514,6 @@ final class Breeze_CloudFlare_Helper {
 		}
 
 		if ( 'cron' === $purge_type ) {
-			/*
-			 * Avoid spawning nested cron jobs when we're already running in a cron context
-			 * (e.g. scheduled post publishing). In this case, execute purge immediately.
-			 */
-			if ( defined( 'DOING_CRON' ) && DOING_CRON ) {
-				if ( true === self::is_log_enabled() ) {
-					error_log( 'CF purge running immediately because current request is DOING_CRON.' );
-				}
-
-				return $this->execute_purge( $purge_url_list, $endpoint_path );
-			}
-
 			$this->spawn_cron( $purge_url_list, $endpoint_path );
 
 			return true;
