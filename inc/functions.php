@@ -20,6 +20,36 @@ defined( 'ABSPATH' ) || die( 'No direct script access allowed!' );
 
 define( 'BREEZE_PLUGIN_FULL_PATH', dirname( __DIR__ ) . '/' );
 require_once BREEZE_PLUGIN_FULL_PATH . 'inc/class-breeze-query-strings-rules.php';
+require_once BREEZE_PLUGIN_FULL_PATH . 'inc/class-breeze-cache-variation-context.php';
+
+/**
+ * Exclude default WordPress comment section markers from HTML minification.
+ *
+ * @param string $exclude_html Comma-separated exclusion list.
+ *
+ * @return string
+ */
+function breeze_exclude_default_wp_comments_from_html_minification( $exclude_html ) {
+	$default_comment_markers = array(
+		'comments',
+		'respond',
+		'commentform',
+		'comment-form',
+		'wp-block-comment-template',
+	);
+
+	$exclude_items = array();
+	if ( ! empty( $exclude_html ) ) {
+		$exclude_items = array_filter( array_map( 'trim', explode( ',', $exclude_html ) ) );
+	}
+
+	$exclude_items = array_merge( $exclude_items, $default_comment_markers );
+	$exclude_items = array_unique( $exclude_items );
+
+	return implode( ',', $exclude_items );
+}
+
+add_filter( 'breeze_filter_html_exclude', 'breeze_exclude_default_wp_comments_from_html_minification' );
 
 /**
  * Get base path for the page cache directory.
@@ -97,10 +127,66 @@ function breeze_current_user_type( $as_dir = true ) {
 		}
 	}
 
-
 	return '';
 }
 
+/**
+ * Whether the "Cache Logged-in Users" toggle is enabled for a single role.
+ *
+ * Despite its name, `breeze-disable-admin` stores an ENABLE flag per role.
+ *
+ * @param string $user_role Role slug, e.g. "administrator".
+ *
+ * @return bool
+ */
+function breeze_is_cache_enabled_for_role( $user_role ) {
+	if ( empty( $user_role ) || ! class_exists( 'Breeze_Options_Reader' ) ) {
+		return false;
+	}
+
+	$role_cache_flags = Breeze_Options_Reader::get_option_value( 'breeze-disable-admin' );
+
+	if ( ! is_array( $role_cache_flags ) || ! isset( $role_cache_flags[ $user_role ] ) ) {
+		return false;
+	}
+
+	return true === filter_var( $role_cache_flags[ $user_role ], FILTER_VALIDATE_BOOLEAN );
+}
+
+/**
+ * User-type segment for minification cache paths, honouring the
+ * "Cache Logged-in Users" setting.
+ *
+ * Returns the role folder (e.g. "administrator/") only when caching is
+ * enabled for one of the current user's roles — the same condition the
+ * HTML cache in wp-content/cache/breeze applies via `disable_per_adminuser`.
+ * Returns '' (root folder, same as a guest) otherwise, so a role folder
+ * is never created for a user whose caching is switched off.
+ *
+ * @param bool $as_dir Append a trailing slash, mirrors breeze_current_user_type().
+ *
+ * @return string
+ */
+function breeze_effective_user_type( $as_dir = true ) {
+	$user_type = breeze_current_user_type( $as_dir );
+
+	// Guest or role not resolvable: root folder, nothing to gate.
+	if ( '' === $user_type ) {
+		return '';
+	}
+
+	if ( ! class_exists( 'Breeze_Options_Reader' ) ) {
+		return $user_type;
+	}
+
+	foreach ( (array) wp_get_current_user()->roles as $one_role ) {
+		if ( breeze_is_cache_enabled_for_role( $one_role ) ) {
+			return $user_type;
+		}
+	}
+
+	return '';
+}
 
 /**
  * Fetches all the current user roles in the wp install, including custom user roles.
@@ -123,12 +209,10 @@ function breeze_all_wp_user_roles() {
 	}
 
 	return $current_roles;
-
 }
 
 function breeze_all_user_folders() {
 	$all_roles = breeze_all_wp_user_roles();
-
 
 	$roles = array(
 		'',
@@ -166,7 +250,6 @@ function breeze_is_feed( $url ) {
 	}
 
 	return false;
-
 }
 
 
@@ -181,7 +264,6 @@ function breeze_treat_exceptions( $content ) {
 	}
 
 	return $content;
-
 }
 
 /**
@@ -244,8 +326,7 @@ function breeze_auth_cookie_clear() {
 	if ( ! apply_filters( 'send_auth_cookies', true ) ) {
 		return;
 	}
-	setcookie( BREEZE_WP_COOKIE, ' ', time() - YEAR_IN_SECONDS, SITECOOKIEPATH, COOKIE_DOMAIN );
-
+	setcookie( BREEZE_WP_COOKIE, ' ', time() - YEAR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN );
 }
 
 add_action( 'init', 'breeze_auth_cookie_set_init', 5 );
@@ -319,12 +400,54 @@ function breeze_is_restricted_access( $bool_response = false ) {
 		} else {
 			return true;//restrict the access.
 		}
-
 	}
 
 	if ( true === $bool_response ) {
 		return false; // Do not restrict.
 	}
+}
+
+/**
+ * Whether this request is a crawler for HTML Double-check.
+ *
+ * An empty user agent stays a normal visitor.
+ *
+ * @return bool
+ */
+function breeze_request_is_doublecheck_bot() {
+	$user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( (string) $_SERVER['HTTP_USER_AGENT'] ) : '';
+	if ( '' === $user_agent ) {
+		return false;
+	}
+
+	$bot_pattern = '/bot|crawl|spider|slurp|bingpreview|mediapartners-google|facebookexternalhit|facebot|twitterbot|linkedinbot|embedly|pinterest|slackbot|vkshare|w3c_validator/i';
+
+	return 1 === preg_match( $bot_pattern, $user_agent );
+}
+
+/**
+ * Whether this bot response must not use the shared page cache.
+ *
+ * The bot HTML omits the Double-check script. With no selectors there is
+ * nothing to omit, so the shared file stays valid.
+ *
+ * @param array $config Breeze configuration.
+ * @return bool
+ */
+function breeze_doublecheck_bypasses_page_cache( $config ) {
+	if ( ! is_array( $config ) ) {
+		return false;
+	}
+
+	$options  = ( isset( $config['cache_options'] ) && is_array( $config['cache_options'] ) ) ? $config['cache_options'] : array();
+	$enabled  = isset( $options['breeze-html-doublecheck'] ) && true === filter_var( $options['breeze-html-doublecheck'], FILTER_VALIDATE_BOOLEAN );
+	$elements = ( isset( $options['breeze-doublecheck-elements'] ) && is_array( $options['breeze-doublecheck-elements'] ) ) ? $options['breeze-doublecheck-elements'] : array();
+
+	if ( ! $enabled || empty( $elements ) ) {
+		return false;
+	}
+
+	return breeze_request_is_doublecheck_bot();
 }
 
 function breeze_which_role_folder( $hash = '' ) {
@@ -356,7 +479,7 @@ function breeze_which_role_folder( $hash = '' ) {
 }
 
 
-function breeze_load_delay_script(){
+function breeze_load_delay_script() {
 
 	$delay_script_js = <<<SCRIPT_TEST
 		<script>
@@ -367,54 +490,131 @@ SCRIPT_TEST;
 	return $delay_script_js;
 }
 
-function breeze_currency_switcher_cache() {
+/**
+ * Collect request-side variation values without deciding whether they are trusted.
+ *
+ * Integration-specific compatibility modules can extend this map. The shared
+ * context validates the resulting values against generated trusted metadata.
+ *
+ * @return array<string,mixed>
+ */
+function breeze_get_cache_variation_request_values() {
+	$values = array();
 
-	$currency = '';
-	if ( isset( $GLOBALS['breeze_config']['curcy-wmc-type'] ) ) {
-		$currency_storage = $GLOBALS['breeze_config']['curcy-wmc-type'];
+	$variation_config = Breeze_Cache_Variation_Context::get_variation_config(
+		isset( $GLOBALS['breeze_config'] ) && is_array( $GLOBALS['breeze_config'] ) ? $GLOBALS['breeze_config'] : array()
+	);
+
+	if ( isset( $variation_config['weglot-language-original'] ) && is_string( $variation_config['weglot-language-original'] ) && '' !== $variation_config['weglot-language-original'] ) {
+		$values['language'] = breeze_get_weglot_language_from_url();
+	}
+
+	if ( isset( $variation_config['curcy-wmc-type'] ) ) {
+		$currency_storage = $variation_config['curcy-wmc-type'];
 		$name             = 'wmc_current_currency';
 
 		if ( 'session' === $currency_storage ) {
-			if ( ! session_id() ) {
+			if ( function_exists( 'session_status' ) && PHP_SESSION_NONE === session_status() && ! headers_sent() ) {
 				@session_start();
-				$currency = isset( $_SESSION[ $name ] ) ? $_SESSION[ $name ] : '';
 			}
-		}
-		if ( 'cookie' === $currency_storage ) {
-			if ( empty( $currency ) ) {
-				$currency = isset( $_COOKIE[ $name ] ) ? $_COOKIE[ $name ] : '';
 
+			if ( isset( $_SESSION[ $name ] ) ) {
+				$values['currency'] = $_SESSION[ $name ];
 			}
+		} elseif ( 'cookie' === $currency_storage && isset( $_COOKIE[ $name ] ) ) {
+			$values['currency'] = $_COOKIE[ $name ];
 		}
 	}
 
-	if ( empty( $currency ) ) {
-		if ( isset( $GLOBALS['_SERVER'], $GLOBALS['_SERVER']['REQUEST_URI'] ) ) {
-			$the_path = trim( $GLOBALS['_SERVER']['REQUEST_URI'], '/' );
+	if ( ! empty( $variation_config['wcml-currency-active'] ) && isset( $_COOKIE['wcml_client_currency'] ) ) {
+		$values['currency'] = $_COOKIE['wcml_client_currency'];
+	}
 
-			if ( ! empty( $the_path ) ) {
-				$county_list = breeze_all_country_codes();
-				if ( false !== strpos( $the_path, '/' ) ) {
-					$e = explode( '/', $the_path );
-					if ( ! empty( $e ) ) {
-						$the_path = $e[0];
-					}
-				}
-
-				$the_path = strtoupper( $the_path );
-				if ( array_key_exists( $the_path, $county_list ) ) {
-					$currency = $currency.$the_path;
-
-				}
-			}
-		}
+	if ( ! empty( $variation_config['aelia-currency-active'] ) && isset( $_COOKIE['aelia_cs_selected_currency'] ) ) {
+		$values['currency'] = $_COOKIE['aelia_cs_selected_currency'];
 	}
 
 	if ( function_exists( 'weglot_get_current_language' ) ) {
-		$currency = $currency.weglot_get_current_language();
+		$values['language'] = weglot_get_current_language();
 	}
 
-	return $currency;
+	if ( function_exists( 'apply_filters' ) ) {
+		$values = apply_filters( 'breeze_cache_variation_request_values', $values );
+	}
+
+	return is_array( $values ) ? $values : array();
+}
+
+/**
+ * Resolve Weglot's URL language without loading the integration.
+ *
+ * @return string
+ */
+function breeze_get_weglot_language_from_url() {
+	$config    = isset( $GLOBALS['breeze_config'] ) && is_array( $GLOBALS['breeze_config'] ) ? $GLOBALS['breeze_config'] : array();
+	$config    = Breeze_Cache_Variation_Context::get_variation_config( $config );
+	$original  = isset( $config['weglot-language-original'] ) && is_string( $config['weglot-language-original'] ) ? $config['weglot-language-original'] : '';
+	$allowlist = isset( $config['cache_variation_allowlist']['language'] ) && is_array( $config['cache_variation_allowlist']['language'] ) ? $config['cache_variation_allowlist']['language'] : array();
+
+	if ( '' === $original || empty( $allowlist ) ) {
+		return $original;
+	}
+
+	$request_uri = isset( $_SERVER['REQUEST_URI'] ) && is_string( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+	$path        = parse_url( $request_uri, PHP_URL_PATH );
+	$segments    = is_string( $path ) ? explode( '/', trim( $path, '/' ) ) : array();
+	$candidate   = ! empty( $segments[0] ) ? strtolower( $segments[0] ) : '';
+
+	foreach ( $allowlist as $language ) {
+		if ( is_string( $language ) && strtolower( $language ) === $candidate ) {
+			return $candidate;
+		}
+	}
+
+	return $original;
+}
+
+/**
+ * Resolve the canonical request variation shared by normal and early execution.
+ *
+ * @param array<string,mixed>|null $config Optional Breeze configuration.
+ * @param array<string,mixed>|null $values Optional request values for fixtures/integrations.
+ *
+ * @return Breeze_Cache_Variation_Context
+ */
+function breeze_get_cache_variation_context( $config = null, $values = null ) {
+	static $contexts = array();
+
+	$cache_request_context = null === $values;
+
+	if ( ! is_array( $config ) ) {
+		$config = isset( $GLOBALS['breeze_config'] ) && is_array( $GLOBALS['breeze_config'] ) ? $GLOBALS['breeze_config'] : array();
+	}
+
+	if ( ! is_array( $values ) ) {
+		$values = breeze_get_cache_variation_request_values();
+	}
+
+	$context_cache_key = md5( serialize( $config ) );
+	if ( $cache_request_context && isset( $contexts[ $context_cache_key ] ) ) {
+		return $contexts[ $context_cache_key ];
+	}
+
+	$context = Breeze_Cache_Variation_Context::from_config( $config, $values );
+	if ( $cache_request_context ) {
+		$contexts[ $context_cache_key ] = $context;
+	}
+
+	return $context;
+}
+
+/**
+ * Gets a bounded filesystem-safe cache suffix for the active variation.
+ *
+ * @return string Cache filename suffix, or an empty string for no variant.
+ */
+function breeze_currency_switcher_cache() {
+	return breeze_get_cache_variation_context()->get_asset_suffix();
 }
 
 /**
@@ -426,7 +626,8 @@ function breeze_is_script_ignored_from_delay( $script = '' ) {
 	}
 
 	$not_delayed     = false;
-	$scripts_ignored = apply_filters( 'default_scripts_gnore_from_delay',
+	$scripts_ignored = apply_filters(
+		'default_scripts_gnore_from_delay',
 		array(
 			'gtag(',
 			'ga(',
@@ -443,7 +644,6 @@ function breeze_is_script_ignored_from_delay( $script = '' ) {
 				$not_delayed = true;
 				break;
 			}
-
 		}
 
 		return $not_delayed;
@@ -704,4 +904,442 @@ function breeze_all_country_codes() {
 		'ZM' => 'Zambia',
 		'ZW' => 'Zimbabwe',
 	);
+}
+
+/**
+ * Load Mobile Detect library based on PHP version
+ *
+ * @return \Breeze\Detection\MobileDetect|false
+ */
+function breeze_mobile_detect_library() {
+	$path_to_plugin = dirname( __DIR__, 1 ) . '/';
+
+	if ( ! class_exists( '\Breeze\Detection\MobileDetect' ) ) {
+		if ( version_compare( PHP_VERSION, '7.3.0' ) >= 0 && version_compare( PHP_VERSION, '8.0.0', '<' ) ) {
+			// Mobile detect 3.74
+			require_once $path_to_plugin . 'vendor-extra/mobiledetect/build/php7/vendor/autoload.php';
+		}
+
+		if ( version_compare( PHP_VERSION, '8.0.0' ) >= 0 && version_compare( PHP_VERSION, '8.2.0', '<' ) ) {
+			// Mobile detect 4.8
+			require_once $path_to_plugin . 'vendor-extra/mobiledetect/build/php8/vendor/autoload.php';
+		}
+
+		if ( version_compare( PHP_VERSION, '8.2.0' ) >= 0 ) {
+			// Mobile Detect 4.11, scoped to prevent global Composer dependency conflicts.
+			$php82_autoload = $path_to_plugin . 'vendor-extra/mobiledetect/build/php82/vendor/autoload.php';
+			if ( file_exists( $php82_autoload ) ) {
+				require_once $php82_autoload;
+			} else {
+				// Fallback to 4.8 build if php82 package is unavailable.
+				require_once $path_to_plugin . 'vendor-extra/mobiledetect/build/php8/vendor/autoload.php';
+			}
+		}
+	}
+
+	if ( class_exists( '\Breeze\Detection\MobileDetect' ) ) {
+		return new \Breeze\Detection\MobileDetect();
+	}
+
+	return false;
+}
+
+/**
+ * Get the device type.
+ *
+ * @return string
+ */
+function breeze_mobile_detect( $as_folder = true ) {
+	if ( false === is_breeze_mobile_cache() ) {
+		return '';
+	}
+	$device_type = '';
+
+	// Cloudways server variable.
+	if ( true === breeze_is_cloudways_server() ) {
+		$get_cloudways_type = breeze_cache_type_return();
+		if ( 'T' === $get_cloudways_type ) {
+			$device_type = 'tablet';
+		} elseif ( 'M' === $get_cloudways_type ) {
+			$device_type = 'mobile';
+		}
+	} else {
+		/**
+		 * \Detection\MobileDetect object
+		 */
+		$is_library = breeze_mobile_detect_library();
+
+		if ( false !== $is_library ) {
+			try {
+				if ( ! isset( $_SERVER['HTTP_USER_AGENT'] ) ) {
+					$_SERVER['HTTP_USER_AGENT'] = 'empty_agent';
+				}
+				$is_library->setUserAgent( $_SERVER['HTTP_USER_AGENT'] );
+				//code...
+				$device_type = ( $is_library->isMobile() ? ( $is_library->isTablet() ? 'tablet' : 'mobile' ) : '' ); // last one can be 'desktop'
+			} catch ( \Exception $e ) {
+				// handle exception
+				$device_type = '';
+			}
+		}
+	}
+
+	if ( true === $as_folder && ! empty( $device_type ) ) {
+		$device_type = $device_type . '_';
+	}
+
+	return $device_type;
+}
+
+/**
+ * Detect if mobile cache is enabled.
+ *
+ * @param bool $just_cw_server To check for Mobile Cache option value only from CW server or also Breeze options.
+ *
+ * @return bool|mixed
+ */
+function is_breeze_mobile_cache( $just_cw_server = false ) {
+	$accepted_cloudways_values = array(
+		'desktop',
+		'tablet',
+		'mobile',
+	);
+	if ( isset( $_SERVER['HTTP_X_DEVICE_TYPE'] ) && in_array( $_SERVER['HTTP_X_DEVICE_TYPE'], $accepted_cloudways_values, true ) ) {
+		return true;
+	}
+
+	// just return false if the server is not CLoudWays.
+	if ( true === $just_cw_server ) {
+		return false;
+	}
+
+	if ( isset( $GLOBALS['breeze_config']['cache_options']['breeze-mobile-separate'] ) ) {
+		return filter_var( $GLOBALS['breeze_config']['cache_options']['breeze-mobile-separate'], FILTER_VALIDATE_BOOLEAN );
+	}
+
+	return false;
+}
+
+/**
+ * Identify server type, Cloudways or other.
+ *
+ * @return bool
+ */
+function breeze_is_cloudways_server() {
+
+	if (
+		false !== strpos( $_SERVER['DOCUMENT_ROOT'], 'cloudwaysapps' ) ||
+		false !== strpos( $_SERVER['DOCUMENT_ROOT'], 'cloudwaysstagingapps' ) ||
+		! empty( getenv( 'FPC_ENV' ) )
+	) {
+		return true;
+	}
+
+	return false;
+}
+
+function breeze_cache_type_return() {
+	$accepted_cloudways_values = array(
+		'desktop',
+		'tablet',
+		'mobile',
+	);
+	/**
+	 * D = Desktop
+	 * T = Tablet
+	 * M = Mobile phone
+	 */
+	$return_type = 'D';
+	if ( isset( $_SERVER['HTTP_X_DEVICE_TYPE'] ) && in_array( $_SERVER['HTTP_X_DEVICE_TYPE'], $accepted_cloudways_values, true ) ) {
+		$cache_type = trim( $_SERVER['HTTP_X_DEVICE_TYPE'] );
+
+		if ( 'tablet' === $cache_type ) {
+			$return_type = 'T';
+		} elseif ( 'mobile' === $cache_type ) {
+			$return_type = 'M';
+		}
+	}
+
+	return $return_type;
+}
+
+function breeze_page_provided_headers() {
+	$headers_output        = array();
+	$headers_output_return = array();
+	if ( ! function_exists( 'apache_request_headers' ) ) {
+
+		foreach ( $_SERVER as $key => $value ) {
+			if ( 'HTTP_' === mb_strtoupper( substr( $key, 0, 5 ) ) ) {
+				$key                    = str_replace( ' ', '-', ucwords( strtolower( str_replace( '_', ' ', substr( $key, 5 ) ) ) ) );
+				$headers_output[ $key ] = $value;
+			} else {
+				$headers_output[ $key ] = $value;
+			}
+		}
+	} else {
+		$headers_output = apache_request_headers();
+	}
+
+	if ( ! empty( $headers_output ) ) {
+		foreach ( $headers_output as $header_key => $heaver_value ) {
+			$headers_output_return[ strtolower( $header_key ) ] = $heaver_value;
+		}
+	}
+
+	return $headers_output_return;
+}
+
+function breeze_org_versions() {
+
+	$url = 'https://api.wordpress.org/plugins/info/1.0/breeze.json?fields=versions';
+
+	$response = wp_remote_get( $url );
+	if ( is_wp_error( $response ) ) {
+		return false;
+	}
+
+	$response_body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+	// Get all versions
+	$versions = array_keys( $response_body['versions'] );
+
+	// Sort versions in descending order
+	usort( $versions, 'version_compare' );
+
+	$current_version_index = array_search( BREEZE_VERSION, $versions ) + 1;
+
+	$prev_5_versions = array_slice( $versions, $current_version_index - 5, 5 );
+
+	$prev_5_versions = array_reverse( $prev_5_versions );
+
+	return $prev_5_versions;
+}
+
+/**
+ * Check if WooCommerce is active.
+ */
+if ( ! function_exists( 'is_woocommerce_active' ) ) {
+	function is_woocommerce_active() {
+		$active_plugins = (array) get_option( 'active_plugins', array() );
+		if ( is_multisite() ) {
+			$active_plugins = array_merge( $active_plugins, get_site_option( 'active_sitewide_plugins', array() ) );
+		}
+
+		if ( in_array( 'woocommerce/woocommerce.php', $active_plugins ) || array_key_exists( 'woocommerce/woocommerce.php', $active_plugins ) || class_exists( 'WooCommerce' ) ) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+}
+
+/**
+ * Check if the directory is empty or not.
+ *
+ * @param string $dir Directory to check string absolute path.
+ *
+ * @return bool
+ */
+function breeze_is_folder_empty( string $dir = '' ): bool {
+	if ( empty( $dir ) ) {
+		return false;
+	}
+
+	if ( ! is_dir( $dir ) ) {
+		return false;// folder does not exist.
+	}
+
+	$wp_filesystem = breeze_get_filesystem();
+
+	// This will return an array with the contents or empty.
+	$files = $wp_filesystem->dirlist( $dir );
+
+	return empty( $files );  // True if the dirlist is empty, false otherwise
+}
+
+/**
+ * Check if a translation plugin is activated.
+ *
+ * @return string
+ */
+function breeze_has_i18n() {
+	global $polylang;
+
+	if ( ! empty( $polylang ) && function_exists( 'pll_languages_list' ) ) {
+		$languages = pll_languages_list();
+
+		if ( empty( $languages ) ) {
+			return '';
+		}
+
+		// Polylang.
+		return 'polylang';
+	}
+}
+
+/**
+ * Get Home URL of active language.
+ *
+ * @return string
+ */
+function breeze_i18n_home_url() {
+	$translation_plugin = breeze_has_i18n();
+
+	$home_url = home_url();
+
+	if ( ! $translation_plugin ) {
+		return $home_url;
+	}
+
+	switch ( $translation_plugin ) {
+		case 'polylang':
+			$polylang = function_exists( 'PLL' ) ? PLL() : $GLOBALS['polylang'];
+
+			if ( ! empty( $polylang->options['force_lang'] ) && isset( $polylang->links ) ) {
+				$home_url = pll_home_url();
+			}
+			break;
+	}
+
+	return $home_url;
+}
+
+/**
+ * Get password-protected URLs index file path.
+ *
+ * @param int $blog_id_requested Optional specific blog ID.
+ *
+ * @return string
+ */
+function breeze_get_password_protected_urls_index_file( $blog_id_requested = 0 ) {
+	$config_dir = rtrim( (string) WP_CONTENT_DIR, '/\\' ) . '/breeze-config';
+	$filename   = 'breeze-protected-urls.php';
+
+	if ( is_multisite() ) {
+		if ( empty( $blog_id_requested ) ) {
+			$blog_id_requested = isset( $GLOBALS['breeze_config']['blog_id'] ) ? (int) $GLOBALS['breeze_config']['blog_id'] : 0;
+		}
+
+		if ( ! empty( $blog_id_requested ) ) {
+			$filename = 'breeze-protected-urls-' . (int) $blog_id_requested . '.php';
+		}
+	}
+
+	return $config_dir . '/' . $filename;
+}
+
+/**
+ * Read normalized password-protected paths from index file.
+ *
+ * @param int $blog_id_requested Optional specific blog ID.
+ *
+ * @return array<int,string>
+ */
+function breeze_get_password_protected_url_paths_from_index( $blog_id_requested = 0 ) {
+	$index_file = breeze_get_password_protected_urls_index_file( $blog_id_requested );
+	if ( ! is_file( $index_file ) ) {
+		return array();
+	}
+
+	$index_payload = include $index_file;
+	if ( ! is_array( $index_payload ) || empty( $index_payload['paths_by_post_id'] ) || ! is_array( $index_payload['paths_by_post_id'] ) ) {
+		return array();
+	}
+
+	return array_values( $index_payload['paths_by_post_id'] );
+}
+
+/**
+ * Check if current request path belongs to a password-protected URL path.
+ *
+ * @return bool
+ */
+function breeze_is_current_request_password_protected_cached() {
+	$request_uri  = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '/';
+	$request_path = parse_url( $request_uri, PHP_URL_PATH );
+	if ( ! is_string( $request_path ) ) {
+		return false;
+	}
+
+	$decoded_path = rawurldecode( $request_path );
+	$current_path = rtrim( $decoded_path, '/' );
+	if ( '' === $current_path ) {
+		$current_path = '/';
+	}
+
+	if ( function_exists( 'mb_strtolower' ) ) {
+		$current_path = mb_strtolower( $current_path );
+	} else {
+		$current_path = strtolower( $current_path );
+	}
+
+	$protected_paths = breeze_get_password_protected_url_paths_from_index();
+	if ( empty( $protected_paths ) ) {
+		return false;
+	}
+
+	foreach ( $protected_paths as $protected_path ) {
+		$protected_path = rtrim( (string) $protected_path, '/' );
+		if ( '' === $protected_path ) {
+			$protected_path = '/';
+		}
+
+		if ( function_exists( 'mb_strtolower' ) ) {
+			$protected_path = mb_strtolower( $protected_path );
+		} else {
+			$protected_path = strtolower( $protected_path );
+		}
+
+		if ( '' === $protected_path ) {
+			continue;
+		}
+
+		// Match only the exact normalized path to avoid excluding descendant paths.
+		if ( $current_path === $protected_path ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Get all password-protected page URLs.
+ *
+ * This function now reads from Breeze's prebuilt index when available.
+ * A fallback query is kept for compatibility when index files are missing.
+ *
+ * @return array<int,string> Array of password-protected page URLs.
+ */
+function breeze_get_password_protected_page_urls() {
+	$protected_paths = breeze_get_password_protected_url_paths_from_index();
+	if ( ! empty( $protected_paths ) ) {
+		$protected_urls = array();
+		foreach ( $protected_paths as $protected_path ) {
+			$protected_urls[] = home_url( $protected_path );
+		}
+
+		return $protected_urls;
+	}
+
+	$protected_urls = array();
+	$post_ids       = get_posts(
+		array(
+			'post_type'      => get_post_types( array( 'public' => true ), 'names' ),
+			'post_status'    => 'publish',
+			'posts_per_page' => - 1,
+			'has_password'   => true,
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
+		)
+	);
+
+	foreach ( $post_ids as $post_id ) {
+		$url = get_permalink( $post_id );
+		if ( $url ) {
+			$protected_urls[] = $url;
+		}
+	}
+
+	return $protected_urls;
 }

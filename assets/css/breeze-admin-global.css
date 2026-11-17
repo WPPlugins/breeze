@@ -32,3 +32,22 @@
 .breeze-box *, ::after, ::before {
   box-sizing: unset;
 }
+
+@media screen and (max-width: 782px) {
+  #wpadminbar li#wp-admin-bar-breeze-topbar {
+    display: block;
+    position: static;
+  }
+}
+.br-beta .br-label .br-option-text:after {
+  content: "beta";
+  margin: 4px 0;
+  padding: 4px 8px;
+  border: 1px solid #D8D8D8;
+  border-radius: 12px;
+  display: inline-block;
+  height: auto;
+  text-align: center;
+  font-size: 14px;
+  color: #11ACDF;
+}
