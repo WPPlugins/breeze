@@ -1,4 +1,7 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 class Breeze_File_Permissions {
 	/**
@@ -54,10 +57,11 @@ class Breeze_File_Permissions {
 	 *              and outputs a message regarding file permission issues or a no-issue status.
 	 */
 	public function breeze_check_the_files_permission() {
+		check_ajax_referer( '_breeze_check_permission', 'security' );
 		$this->check_specific_files_folders();
 		$message_display = '';
 		if ( false === self::is_cache() ) {
-			wp_die( $message_display );
+			wp_die( esc_html( $message_display ) );
 		}
 
 		if ( ! empty( self::$errors ) ) {
@@ -76,11 +80,7 @@ class Breeze_File_Permissions {
 			$message_display .= '</div>';
 		}
 
-		if ( empty( $message_display ) ) {
-			$message_display = 'no-issue';
-		}
-
-		wp_die( $message_display );
+		wp_die( esc_html( $message_display ) );
 	}
 
 	/**
@@ -115,7 +115,32 @@ class Breeze_File_Permissions {
 
 	}
 
+	// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_is_writable
+	/**
+	 * Collects the Breeze files and folders that are missing or not writable.
+	 *
+	 * Runs on every admin page, so it checks with is_writable() directly:
+	 * wp_is_writable() would create and delete a test file in each folder on
+	 * Windows servers.
+	 *
+	 * @return void
+	 */
 	public function check_specific_files_folders() {
+
+		/**
+		 * A minified file that Breeze itself is no longer allowed to write to.
+		 * Its folder can be perfectly writable, so this is not covered by the
+		 * folder checks below.
+		 */
+		if ( class_exists( 'Breeze_MinificationCache' ) ) {
+			$unwritable_file = Breeze_MinificationCache::unwritable_file();
+
+			if ( '' !== $unwritable_file ) {
+				self::append_permission_error(
+					$unwritable_file . __( ' file is not writable. Minified files owned by another user cannot be maintained and may be removed while pages still use them.', 'breeze' )
+				);
+			}
+		}
 
 		$cache_specific_folders = breeze_all_user_folders();
 		$assets_folders         = array(
@@ -175,7 +200,7 @@ class Breeze_File_Permissions {
 					self::append_permission_error( $folder_min . __( ' folder is not writable.', 'breeze' ) );
 				}
 
-				$blogs = get_sites();
+				$blogs = get_sites( array( 'number' => 0 ) );
 				if ( ! empty( $blogs ) ) {
 					foreach ( $blogs as $blog_data ) {
 						$blog_id = $blog_data->blog_id;
@@ -267,6 +292,7 @@ class Breeze_File_Permissions {
 		}
 
 	}
+	// phpcs:enable
 
 	/**
 	 * Displays error messages related to file permission issues.
@@ -280,9 +306,9 @@ class Breeze_File_Permissions {
 			$this->check_specific_files_folders();
 			if ( ! empty( self::$errors ) ) {
 				echo '<div class="notice notice-error is-dismissible breeze-per" style="margin-left:2px">';
-				echo '<p><strong>' . __( 'Breeze plugin functionality may be affected due to missing config file(s) or folder(s), or issues with file permissions preventing proper operation.', 'breeze' ) . '</strong></p>';
+				echo '<p><strong>' . esc_html__( 'Breeze plugin functionality may be affected due to missing config file(s) or folder(s), or issues with file permissions preventing proper operation.', 'breeze' ) . '</strong></p>';
 				foreach ( self::$errors as $message ) {
-					echo '<p>' . $message . '</p>';
+					echo '<p>' . esc_html( $message ) . '</p>';
 				}
 				echo '<p>';
 				printf(
@@ -319,17 +345,17 @@ class Breeze_File_Permissions {
 			return;
 		}
 
-		$message = __( 'The Breeze Cache System is disabled in the settings</strong>, the website performance might drop. You can enable the cache system in the Breeze settings ', 'breeze' );
+		$message = '<strong>' . esc_html__( 'The Breeze Cache System is disabled in the settings', 'breeze' ) . '</strong>' . esc_html__( ', the website performance might drop. You can enable the cache system in the Breeze settings ', 'breeze' );
 
 		$is_network   = is_multisite() && is_network_admin();
 		$settings_url = $is_network ? network_admin_url( 'settings.php?page=breeze' ) : admin_url( 'options-general.php?page=breeze' );
 
 		$notice  = '<div class="notice notice-warning is-dismissible breeze-cs" style="margin-left:2px">';
-		$notice .= '<p><strong>' . $message . '<a href="%s" id="breeze-cache-on">%s</a>.</p>';
+		$notice .= '<p>' . $message . '<a href="%s" id="breeze-cache-on">%s</a>.</p>';
 		$notice .= '</div>';
 
 		printf(
-			$notice,
+			wp_kses_post( $notice ),
 			esc_url( $settings_url ),
 			esc_html__( 'here', 'breeze' )
 		);
