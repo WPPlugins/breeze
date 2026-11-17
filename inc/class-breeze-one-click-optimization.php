@@ -126,8 +126,6 @@ class Breeze_One_Click_Optimization {
 				'breeze-wp-emoji'                      => '1',
 				'breeze-preload-links'                 => '1',
 				'breeze-store-googlefonts-locally'     => '1',
-				'breeze-store-googleanalytics-locally' => '0',
-				'breeze-store-facebookpixel-locally'   => '0',
 				'breeze-store-gravatars-locally'       => '0',
 			),
 		),
@@ -158,8 +156,6 @@ class Breeze_One_Click_Optimization {
 				'breeze-wp-emoji'                      => '1',
 				'breeze-preload-links'                 => '1',
 				'breeze-store-googlefonts-locally'     => '1',
-				'breeze-store-googleanalytics-locally' => '1',
-				'breeze-store-facebookpixel-locally'   => '1',
 				'breeze-store-gravatars-locally'       => '1',
 			),
 		),
@@ -279,6 +275,7 @@ class Breeze_One_Click_Optimization {
 
 		wp_send_json_success(
 			array(
+				/* translators: %s: Optimization level name, e.g. Basic, Advanced or Expert. */
 				'message' => sprintf( __( '%s optimization level applied successfully.', 'breeze' ), ucfirst( $level ) ),
 			)
 		);
@@ -532,7 +529,7 @@ class Breeze_One_Click_Optimization {
 	public static function breeze_hide_optimization_notice() {
 		check_ajax_referer( '_breeze_save_options', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( __( 'You do not have permission to perform this action.', 'breeze' ) );
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'breeze' ) );
 		}
 		breeze_update_option( self::$option_name, array( 'hide_notice' => true ) );
 		wp_die();
@@ -553,12 +550,12 @@ class Breeze_One_Click_Optimization {
 		?>
 		<div class="breeze-top-notice optimization-notice">
 			<div class="notice-content">
-				<h3><?php _e( 'Optimize Your Site in One Click', 'breeze' ); ?></h3>
-				<p><?php _e( 'Save time with Breeze\'s predefined optimization presets. These presets simplify optimization by automatically enabling proven performance settings.', 'breeze' ); ?></p>
-				<button class="button button-primary explore-optimization"><?php _e( 'Explore Optimization Options', 'breeze' ); ?></button>
+				<h3><?php esc_html_e( 'Optimize Your Site in One Click', 'breeze' ); ?></h3>
+				<p><?php esc_html_e( 'Save time with Breeze\'s predefined optimization presets. These presets simplify optimization by automatically enabling proven performance settings.', 'breeze' ); ?></p>
+				<button class="button button-primary explore-optimization"><?php esc_html_e( 'Explore Optimization Options', 'breeze' ); ?></button>
 			</div>
-			<img class="close-notice" src="<?php echo BREEZE_PLUGIN_URL . 'assets/images/add_circle.svg'; ?>"
-				alt="<?php _e( 'Close', 'breeze' ); ?>">
+			<img class="close-notice" src="<?php echo esc_url( BREEZE_PLUGIN_URL . 'assets/images/add_circle.svg' ); ?>"
+				alt="<?php esc_attr_e( 'Close', 'breeze' ); ?>">
 		</div>
 		<?php
 	}

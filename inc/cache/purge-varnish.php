@@ -24,11 +24,15 @@ class Breeze_PurgeVarnish {
 	protected $blogId;
 	protected $urlsPurge   = array();
 	protected $auto_purge  = false;
+	protected static $has_executed_purge = false;
+	/**
+	 * save_post is registered in init() only when page cache is off. Breeze_PurgeCache
+	 * already purges Varnish on save when breeze-active is on, and a second hook would
+	 * repeat those requests.
+	 */
 	protected $actions     = array(
 		'switch_theme',                        // After a theme is changed
-		'save_post',                            // Save a post
 		'deleted_post',                        // Delete a post
-		'edit_post',                            // Edit a post - includes leaving comments
 	);
 	protected $actionsNoId = array( 'switch_theme' );
 
@@ -69,6 +73,12 @@ class Breeze_PurgeVarnish {
 			// Pust urlsPurge after comment
 			add_action( 'comment_post', array( $this, 'purge_post_on_comment' ), 10, 3 );
 			add_action( 'wp_set_comment_status', array( $this, 'purge_post_on_comment_status' ), 10, 2 );
+
+			// Breeze_PurgeCache owns save_post when page cache is on. Without that
+			// class, a post update never reaches Varnish.
+			if ( empty( Breeze_Options_Reader::get_option_value( 'breeze-active' ) ) ) {
+				add_action( 'save_post', array( $this, 'purge_post' ) );
+			}
 		}
 		// Execute Purge
 		add_action( 'shutdown', array( $this, 'breeze_execute_purge' ) );
@@ -78,6 +88,11 @@ class Breeze_PurgeVarnish {
 	 * Execute Purge
 	 */
 	public function breeze_execute_purge() {
+		if ( true === self::$has_executed_purge ) {
+			return;
+		}
+
+		self::$has_executed_purge = true;
 
 		if ( ! empty( $this->urlsPurge ) ) {
 			$urlsPurge = array_unique( $this->urlsPurge );
@@ -88,9 +103,8 @@ class Breeze_PurgeVarnish {
 			$do_purge = is_varnish_cache_started();
 
 			if ( true === $do_purge ) {
-				foreach ( $urlsPurge as $url ) {
-					$this->purge_cache( $url );
-				}
+				// Runs on shutdown, which still blocks the response under PHP-FPM.
+				Breeze_PurgeCache::purge_varnish_urls( $urlsPurge );
 			}
 		} else {
 			$homepage = home_url() . '/?breeze';
@@ -102,7 +116,7 @@ class Breeze_PurgeVarnish {
 
 			if ( isset( $_GET['breeze_purge'] ) && check_admin_referer( 'breeze_purge_cache' ) ) {
 				// clear static cache
-				$size_cache = Breeze_Configuration::breeze_clean_cache();
+				$size_cache = Breeze_Configuration::breeze_clean_cache( false );
 				$class      = 'notice notice-success is-dismissible breeze-notice message-clear-cache-top';
 				$message    = __( 'Cache data has been purged: ', 'breeze' ) . $size_cache . __( ' Kb static cache cleaned', 'breeze' );
 
@@ -121,6 +135,12 @@ class Breeze_PurgeVarnish {
 					$response = Breeze_CloudFlare_Helper::reset_all_cache();
 					$this->print_cloudflare_cache_purge_notification( $response );
 				}
+
+				Breeze_PurgeCache::__flush_object_cache();
+
+				if ( class_exists( '\Breeze\Cache\Breeze_Cache_Preloader' ) ) {
+					\Breeze\Cache\Breeze_Cache_Preloader::schedule_preload();
+				}
 			}
 		}
 	}
@@ -128,10 +148,21 @@ class Breeze_PurgeVarnish {
 	/**
 	 * Print a admin notice for cloudflare cache purge response.
 	 *
-	 * @param int|string $res Response http code returned from cf microservice.
+	 * @param int|string|bool $res Response http code returned from cf microservice.
 	 */
 	public function print_cloudflare_cache_purge_notification( $res ) {
 
+		// if $res is a boolean, it is a success or error
+		if ( is_bool( $res ) ) {
+			if(true === $res) {
+				$message = __( 'Cloudflare Cache has been purged. ', 'breeze' );
+				$class   = 'notice notice-success is-dismissible breeze-notice message-clear-cache-top';
+			} else {
+				$message = __( 'An error occurred while purging the Cloudflare cache. Please try again or contact support.', 'breeze' );
+				$class   = 'notice notice-error is-dismissible breeze-notice message-clear-cache-top';
+			}
+		} else {
+			// if $res is not a boolean, it is a response code
 		if ( 200 === $res ) {
 			$message = __( 'Cloudflare Cache has been purged. ', 'breeze' );
 			$class   = 'notice notice-success is-dismissible breeze-notice message-clear-cache-top';
@@ -157,6 +188,7 @@ class Breeze_PurgeVarnish {
 			$message = __( 'An error occurred while purging the Cloudflare cache. Please try again or contact support.', 'breeze' );
 			$class   = 'notice notice-error is-dismissible breeze-notice message-clear-cache-top';
 		}
+	}
 		printf(
 			'<div class="%1$s" style="margin: 10px 14px 10px 0;padding: 10px; font-weight: 600;">
 				<p>%2$s</p>
@@ -173,6 +205,11 @@ class Breeze_PurgeVarnish {
 	 * Purge varnish cache
 	 */
 	public function purge_cache( $url ) {
+		// Never send purge traffic when Varnish is off; the requests would hit PHP-FPM.
+		if ( ! is_varnish_cache_started() ) {
+			return array( 'response' => array( 'code' => 200 ) );
+		}
+
 		if ( true === Breeze_CloudFlare_Helper::is_log_enabled() ) {
 			error_log( '######### PURGE VANISH; URL(s) ###: ' . var_export( $url, true ) );
 		}
@@ -239,10 +276,6 @@ class Breeze_PurgeVarnish {
 	 * Purge varnish cache with action if id post exists
 	 */
 	public function purge_post( $postId ) {
-		if ( 'save_post' === current_action() && did_action( 'edit_post' ) ) {
-			// Prevent triggering this method twice when posts are updated.
-			return;
-		}
 		$this->pushUrl( $postId );
 	}
 

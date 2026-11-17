@@ -201,10 +201,36 @@ class Breeze_Configuration {
 			parse_str( wp_unslash( $_POST['form-data'] ), $post_item );
 		}
 
-		$exclude_css = $this->string_convert_arr( sanitize_textarea_field( $post_item['exclude-css'] ) );
-		$exclude_js  = $this->string_convert_arr( sanitize_textarea_field( $post_item['exclude-js'] ) );
-		$no_delay_js = $this->string_convert_arr( sanitize_textarea_field( $post_item['no-delay-js-scripts'] ) );
-		$delay_js    = $this->string_convert_arr( sanitize_textarea_field( $post_item['delay-js-scripts'] ) );
+		$doublecheck_html_input         = $this->string_convert_arr( sanitize_textarea_field( isset( $post_item['doublecheck-elements'] ) ? $post_item['doublecheck-elements'] : '' ) );
+		$doublecheck_html_data          = $this->sanitize_doublecheck_selectors( $doublecheck_html_input );
+		$doublecheck_html               = $doublecheck_html_data['selectors'];
+		$doublecheck_html_notice        = $this->get_doublecheck_selectors_notice_message(
+			(int) $doublecheck_html_data['normalized_count'],
+			(int) $doublecheck_html_data['removed_count'],
+			(int) $doublecheck_html_data['removed_root_count']
+		);
+		$doublecheck_loader_overlay     = $this->sanitize_doublecheck_overlay_color(
+			sanitize_text_field( $post_item['html-doublecheck-loader-overlay'] ?? '' )
+		);
+		$doublecheck_exclude_url_input  = $this->string_convert_arr( sanitize_textarea_field( $post_item['doublecheck-exclude-url'] ?? '' ) );
+		$doublecheck_exclude_url_data   = $this->sanitize_doublecheck_exclude_urls( $doublecheck_exclude_url_input );
+		$doublecheck_exclude_url        = $doublecheck_exclude_url_data['urls'];
+		$doublecheck_exclude_url_notice = $this->get_doublecheck_exclude_urls_notice_message(
+			(int) $doublecheck_exclude_url_data['removed_invalid'],
+			(int) $doublecheck_exclude_url_data['removed_duplicates']
+		);
+		$exclude_css                    = $this->string_convert_arr( sanitize_textarea_field( $post_item['exclude-css'] ) );
+		$exclude_js                     = $this->string_convert_arr( sanitize_textarea_field( $post_item['exclude-js'] ) );
+		$no_delay_js                    = $this->string_convert_arr( sanitize_textarea_field( $post_item['no-delay-js-scripts'] ) );
+		$delay_js                       = $this->string_convert_arr( sanitize_textarea_field( $post_item['delay-js-scripts'] ) );
+
+		if ( '' !== $doublecheck_html_notice ) {
+			$response['doublecheck_elements_error'] = $doublecheck_html_notice;
+		}
+
+		if ( '' !== $doublecheck_exclude_url_notice ) {
+			$response['doublecheck_exclude_url_error'] = $doublecheck_exclude_url_notice;
+		}
 
 		if ( ! empty( $exclude_js ) ) {
 			$exclude_js = array_unique( $exclude_js );
@@ -252,25 +278,60 @@ class Breeze_Configuration {
 			//$is_group_js = '0';
 		}
 
+		// get the doublecheck load option
+		$breeze_doublecheck_load = $post_item['doublecheck-load'];
+		/*
+		 * If the doublecheck load option is not async, set it to async
+		 * and apply the filters to the doublecheck load option
+		 * and sanitize the doublecheck load option
+		 * and if the doublecheck load option is not in the doublecheck load options, set it to async
+		 * and return the doublecheck load option
+		 */
+		if ( $breeze_doublecheck_load !== 'async') {
+			$breeze_doublecheck_load = 'async';
+			$breeze_doublecheck_load = apply_filters( 'breeze_doublecheck_load', $breeze_doublecheck_load );		
+
+			if ( $breeze_doublecheck_load !== 'async' ) {
+				$doublecheck_load_options = array(
+					'preload' => 'preload',
+					'onload'  => 'onload',
+					'async'   => 'async',
+				);
+				if ( ! in_array( $breeze_doublecheck_load, $doublecheck_load_options, true ) ) {			 
+					$breeze_doublecheck_load = 'async';
+				}
+			}
+		}
+		$breeze_doublecheck_load = sanitize_textarea_field( $breeze_doublecheck_load );
+
 		$file_settings = array(
-			'breeze-minify-html'        => ( isset( $post_item['minification-html'] ) ? '1' : '0' ),
+			'breeze-enable-html-cache'               => ( isset( $post_item['enable-html-cache'] ) ? '1' : '0' ),
+			'breeze-html-doublecheck'                => ( isset( $post_item['html-doublecheck'] ) ? '1' : '0' ),
+			'breeze-doublecheck-elements'            => $doublecheck_html,
+			'breeze-doublecheck-elements-error'      => $doublecheck_html_notice,
+			'breeze-doublecheck-load'                => $breeze_doublecheck_load,
+			'breeze-html-doublecheck-loader'         => ( isset( $post_item['html-doublecheck-loader'] ) ? '1' : '0' ),
+			'breeze-html-doublecheck-loader-overlay' => $doublecheck_loader_overlay,
+			'breeze-doublecheck-exclude-url'         => $doublecheck_exclude_url,
+			'breeze-doublecheck-exclude-url-error'   => $doublecheck_exclude_url_notice,
+			'breeze-minify-html'                     => ( isset( $post_item['minification-html'] ) ? '1' : '0' ),
 			// --
-			'breeze-minify-css'         => ( isset( $post_item['minification-css'] ) ? '1' : '0' ),
-			'breeze-font-display-swap'  => ( isset( $post_item['font-display'] ) ? '1' : '0' ),
-			'breeze-group-css'          => ( isset( $post_item['group-css'] ) ? '1' : '0' ),
-			'breeze-exclude-css'        => $exclude_css,
-			'breeze-include-inline-css' => ( isset( $post_item['include-inline-css'] ) ? '1' : '0' ),
+			'breeze-minify-css'                      => ( isset( $post_item['minification-css'] ) ? '1' : '0' ),
+			'breeze-font-display-swap'               => ( isset( $post_item['font-display'] ) ? '1' : '0' ),
+			'breeze-group-css'                       => ( isset( $post_item['group-css'] ) ? '1' : '0' ),
+			'breeze-exclude-css'                     => $exclude_css,
+			'breeze-include-inline-css'              => ( isset( $post_item['include-inline-css'] ) ? '1' : '0' ),
 			// --
-			'breeze-minify-js'          => $is_minification_js,
-			'breeze-group-js'           => $is_group_js,
-			'breeze-include-inline-js'  => $is_inline_minification_js,
-			'breeze-exclude-js'         => $exclude_js,
-			'breeze-move-to-footer-js'  => $move_to_footer_js,
-			'breeze-defer-js'           => $defer_js,
-			'breeze-enable-js-delay'    => ( isset( $post_item['enable-js-delay'] ) ? '1' : '0' ),
-			'breeze-delay-js-scripts'   => $delay_js,
-			'no-breeze-no-delay-js'     => $no_delay_js,
-			'breeze-delay-all-js'       => ( isset( $post_item['breeze-delay-all-js'] ) ? '1' : '0' ),
+			'breeze-minify-js'                       => $is_minification_js,
+			'breeze-group-js'                        => $is_group_js,
+			'breeze-include-inline-js'               => $is_inline_minification_js,
+			'breeze-exclude-js'                      => $exclude_js,
+			'breeze-move-to-footer-js'               => $move_to_footer_js,
+			'breeze-defer-js'                        => $defer_js,
+			'breeze-enable-js-delay'                 => ( isset( $post_item['enable-js-delay'] ) ? '1' : '0' ),
+			'breeze-delay-js-scripts'                => $delay_js,
+			'no-breeze-no-delay-js'                  => $no_delay_js,
+			'breeze-delay-all-js'                    => ( isset( $post_item['breeze-delay-all-js'] ) ? '1' : '0' ),
 		);
 
 		breeze_update_option( 'file_settings', $file_settings, true );
@@ -331,10 +392,106 @@ class Breeze_Configuration {
 			}
 		}
 
+		$cache_warmup_enabled = ( isset( $post_item['breeze-cache-warmup-enabled'] ) ? '1' : '0' );
+		$is_network_scope     = is_multisite()
+			&& function_exists( 'breeze_request_wants_network_scope' )
+			&& function_exists( 'breeze_user_can_manage_network' )
+			&& breeze_request_wants_network_scope()
+			&& breeze_user_can_manage_network();
+
+		$current_preload_options = breeze_get_option( 'preload_settings', false );
+
+		// Cache warmup URLs: validate that every entry belongs to this site.
+		$raw_warmup_urls   = $this->string_convert_arr(
+			sanitize_textarea_field( isset( $post_item['breeze-preload-cache-urls'] ) ? $post_item['breeze-preload-cache-urls'] : '' )
+		);
+		$valid_warmup_urls = ( isset( $current_preload_options['breeze-preload-cache-urls'] ) && is_array( $current_preload_options['breeze-preload-cache-urls'] ) ) ? $current_preload_options['breeze-preload-cache-urls'] : array();
+		$invalid_count     = 0;
+		// For each warmup URL, check if it belongs to this site.
+		// If it does, add it to the valid warmup URLs array.
+		// If it doesn't, add it to the invalid warmup URLs array.
+		// The invalid warmup URLs array will be used to display an error message to the user.
+		$excess_count = 0;
+		$max_urls     = $this->get_warmup_urls_limit();
+		if ( '1' === $cache_warmup_enabled ) {
+			$valid_warmup_urls = array();
+			// Track normalized URLs already accepted so each one is stored only
+			// once, regardless of how many times it appears in the textarea.
+			$seen_warmup_urls = array();
+			foreach ( $raw_warmup_urls as $warmup_url ) {
+				$warmup_url = trim( $warmup_url );
+				if ( empty( $warmup_url ) ) {
+					continue;
+				}
+
+				$matched_blog_id = $this->get_matching_blog_id_for_warmup_url( $warmup_url );
+				if (
+					( $is_network_scope && $matched_blog_id > 0 )
+					|| ( ! $is_network_scope && get_current_blog_id() === $matched_blog_id )
+				) {
+					$normalized_url = esc_url_raw( $warmup_url );
+					if ( '' === $normalized_url || isset( $seen_warmup_urls[ $normalized_url ] ) ) {
+						continue;
+					}
+
+					$seen_warmup_urls[ $normalized_url ] = true;
+					$valid_warmup_urls[]                 = $normalized_url;
+				} else {
+					++$invalid_count;
+				}
+			}
+
+			// Enforce the hard scheduling cap server-side too, so bypassing the
+			// front-end limit still cannot store more than the allowed number.
+			if ( count( $valid_warmup_urls ) > $max_urls ) {
+				$excess_count      = count( $valid_warmup_urls ) - $max_urls;
+				$valid_warmup_urls = array_slice( $valid_warmup_urls, 0, $max_urls );
+			}
+		}
+
+		$warmup_messages = array();
+		// Create an error message if there are any invalid warmup URLs.
+		if ( $invalid_count > 0 ) {
+			$warmup_messages[] = sprintf(
+				/* translators: 1: number of rejected URLs, 2: scope label */
+				_n(
+					'%1$d URL was removed: only URLs from %2$s are allowed for cache warmup.',
+					'%1$d URLs were removed: only URLs from %2$s are allowed for cache warmup.',
+					$invalid_count,
+					'breeze'
+				),
+				$invalid_count,
+				$is_network_scope ? esc_html__( 'this network sites', 'breeze' ) : esc_html( home_url() )
+			);
+		}
+
+		// Inform the user when entries were dropped for exceeding the cap.
+		if ( $excess_count > 0 ) {
+			$warmup_messages[] = sprintf(
+				/* translators: 1: number of dropped URLs, 2: maximum allowed URLs */
+				_n(
+					'%1$d URL was removed: a maximum of %2$d cache warmup URLs can be saved.',
+					'%1$d URLs were removed: a maximum of %2$d cache warmup URLs can be saved.',
+					$excess_count,
+					'breeze'
+				),
+				$excess_count,
+				$max_urls
+			);
+		}
+
+		$warmup_error = implode( ' ', $warmup_messages );
+		if ( '' !== $warmup_error ) {
+			$response['preload_urls_error'] = $warmup_error;
+		}
+
 		$preload = array(
-			'breeze-preload-fonts' => $preload_fonts,
-			'breeze-preload-links' => ( isset( $post_item['preload-links'] ) ? '1' : '0' ),
-			'breeze-prefetch-urls' => $prefetch_urls,
+			'breeze-preload-fonts'            => $preload_fonts,
+			'breeze-preload-links'            => ( isset( $post_item['preload-links'] ) ? '1' : '0' ),
+			'breeze-prefetch-urls'            => $prefetch_urls,
+			'breeze-cache-warmup-enabled'     => $cache_warmup_enabled,
+			'breeze-preload-cache-urls'       => $valid_warmup_urls,
+			'breeze-preload-cache-urls-error' => $warmup_error,
 		);
 
 		breeze_update_option( 'preload_settings', $preload, true );
@@ -347,6 +504,162 @@ class Breeze_Configuration {
 		do_action( 'breeze_clear_all_cache' );
 
 		wp_send_json( $response );
+	}
+
+	/**
+	 * Resolve the maximum number of cache warmup URLs that may be saved.
+	 *
+	 * Mirrors the scheduling cap in Breeze_Cache_Preloader so the UI, the save
+	 * handler, and the scheduler all agree. Falls back to 30 if the preloader
+	 * class is unavailable for any reason.
+	 *
+	 * @return int
+	 */
+	private function get_warmup_urls_limit(): int {
+		if ( method_exists( '\Breeze\Cache\Breeze_Cache_Preloader', 'get_max_urls' ) ) {
+			return \Breeze\Cache\Breeze_Cache_Preloader::get_max_urls();
+		}
+
+		return (int) apply_filters( 'breeze_preload_max_urls', 30 );
+	}
+
+	/**
+	 * Resolve which blog in this network owns a warmup URL.
+	 *
+	 * Uses host + longest path prefix matching for subfolder multisite.
+	 *
+	 * @param string $url Warmup URL.
+	 * @return int Blog ID, or 0 when URL does not belong to this install/network.
+	 */
+	private function get_matching_blog_id_for_warmup_url( string $url ): int {
+		if ( empty( $url ) ) {
+			return 0;
+		}
+
+		$site_home = home_url( '/' );
+		if ( ! $this->is_safe_local_candidate_url( $url, $site_home ) ) {
+			return 0;
+		}
+
+		if ( ! is_multisite() ) {
+			$url_path  = $this->normalize_url_path( (string) wp_parse_url( $url, PHP_URL_PATH ) );
+			$site_path = $this->normalize_url_path( (string) wp_parse_url( $site_home, PHP_URL_PATH ) );
+
+			return ( 0 === strpos( $url_path, $site_path ) ) ? get_current_blog_id() : 0;
+		}
+
+		$url_path = $this->normalize_url_path( (string) wp_parse_url( $url, PHP_URL_PATH ) );
+
+		$sites = get_sites(
+			array(
+				'number'   => 0,
+				'fields'   => 'ids',
+				'archived' => 0,
+				'spam'     => 0,
+				'deleted'  => 0,
+			)
+		);
+
+		$matched_blog_id = 0;
+		$matched_len     = -1;
+
+		foreach ( $sites as $site_id ) {
+			$site_id   = (int) $site_id;
+			$site_home = get_home_url( $site_id, '/' );
+			if ( ! $this->is_safe_local_candidate_url( $url, $site_home ) ) {
+				continue;
+			}
+
+			$site_path = $this->normalize_url_path( (string) wp_parse_url( $site_home, PHP_URL_PATH ) );
+			if ( 0 !== strpos( $url_path, $site_path ) ) {
+				continue;
+			}
+
+			$path_len = strlen( $site_path );
+			if ( $path_len > $matched_len ) {
+				$matched_len     = $path_len;
+				$matched_blog_id = $site_id;
+			}
+		}
+
+		return $matched_blog_id;
+	}
+
+	/**
+	 * Validate a warmup URL against site home URL constraints.
+	 *
+	 * Requires HTTP(S), blocks URL userinfo, and enforces same host/scheme/port.
+	 *
+	 * @param string $url Target URL.
+	 * @param string $site_home Site home URL used as security baseline.
+	 * @return bool
+	 */
+	private function is_safe_local_candidate_url( string $url, string $site_home ): bool {
+		$url_parts  = wp_parse_url( $url );
+		$site_parts = wp_parse_url( $site_home );
+
+		if ( ! is_array( $url_parts ) || ! is_array( $site_parts ) ) {
+			return false;
+		}
+
+		$url_scheme  = isset( $url_parts['scheme'] ) ? strtolower( (string) $url_parts['scheme'] ) : '';
+		$site_scheme = isset( $site_parts['scheme'] ) ? strtolower( (string) $site_parts['scheme'] ) : '';
+
+		if ( empty( $url_scheme ) || empty( $site_scheme ) ) {
+			return false;
+		}
+
+		if ( ! in_array( $url_scheme, array( 'http', 'https' ), true ) || $url_scheme !== $site_scheme ) {
+			return false;
+		}
+
+		if ( ! empty( $url_parts['user'] ) || ! empty( $url_parts['pass'] ) ) {
+			return false;
+		}
+
+		$url_host  = isset( $url_parts['host'] ) ? (string) $url_parts['host'] : '';
+		$site_host = isset( $site_parts['host'] ) ? (string) $site_parts['host'] : '';
+
+		if ( empty( $url_host ) || empty( $site_host ) || 0 !== strcasecmp( $url_host, $site_host ) ) {
+			return false;
+		}
+
+		$url_port  = isset( $url_parts['port'] ) ? (int) $url_parts['port'] : $this->get_default_port_for_scheme( $url_scheme );
+		$site_port = isset( $site_parts['port'] ) ? (int) $site_parts['port'] : $this->get_default_port_for_scheme( $site_scheme );
+
+		if ( $url_port <= 0 || $site_port <= 0 || $url_port !== $site_port ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Normalize URL path to slash-prefixed and slash-suffixed format.
+	 *
+	 * @param string $path Raw URL path.
+	 * @return string
+	 */
+	private function normalize_url_path( string $path ): string {
+		return trailingslashit( '/' . ltrim( $path, '/' ) );
+	}
+
+	/**
+	 * Resolve default port for supported HTTP schemes.
+	 *
+	 * @param string $scheme URL scheme.
+	 * @return int
+	 */
+	private function get_default_port_for_scheme( string $scheme ): int {
+		if ( 'https' === $scheme ) {
+			return 443;
+		}
+
+		if ( 'http' === $scheme ) {
+			return 80;
+		}
+
+		return 0;
 	}
 
 	/**
@@ -394,25 +707,23 @@ class Breeze_Configuration {
 		}
 
 		$advanced = array(
-			'breeze-exclude-urls'                  => $exclude_urls,
-			'cached-query-strings'                 => $cache_query_str,
-			'breeze-wp-emoji'                      => ( isset( $post_item['breeze-wpjs-emoji'] ) ? '1' : '0' ),
-			'breeze-store-googlefonts-locally'     => ( isset( $post_item['breeze-store-googlefonts-locally'] ) ? '1' : '0' ),
-			'breeze-store-googleanalytics-locally' => ( isset( $post_item['breeze-store-googleanalytics-locally'] ) ? '1' : '0' ),
-			'breeze-store-facebookpixel-locally'   => ( isset( $post_item['breeze-store-facebookpixel-locally'] ) ? '1' : '0' ),
-			'breeze-store-gravatars-locally'       => ( isset( $post_item['breeze-store-gravatars-locally'] ) ? '1' : '0' ),
-			'breeze-enable-api'                    => ( isset( $post_item['breeze-enable-api'] ) ? '1' : '0' ),
-			'breeze-api-token'                     => sanitize_text_field( $breeze_api_token ),
+			'breeze-exclude-urls'              => $exclude_urls,
+			'cached-query-strings'             => $cache_query_str,
+			'breeze-wp-emoji'                  => ( isset( $post_item['breeze-wpjs-emoji'] ) ? '1' : '0' ),
+			'breeze-store-googlefonts-locally' => ( isset( $post_item['breeze-store-googlefonts-locally'] ) ? '1' : '0' ),
+			'breeze-store-gravatars-locally'   => ( isset( $post_item['breeze-store-gravatars-locally'] ) ? '1' : '0' ),
+			'breeze-enable-api'                => ( isset( $post_item['breeze-enable-api'] ) ? '1' : '0' ),
+			'breeze-api-token'                 => sanitize_text_field( $breeze_api_token ),
 		);
 
-        if ( !empty( $breeze_api_token ) && true === $this->is_api_token_valid( $breeze_api_token ) ) {
-            $advanced['breeze-api-token'] = sanitize_text_field($breeze_api_token);
-        }else{
-            $current_token = Breeze_Options_Reader::get_option_value( 'breeze-api-token' );
-            if( !empty( $current_token ) ){
-                $advanced['breeze-api-token'] = sanitize_text_field($current_token);
-            }
-        }
+		if ( ! empty( $breeze_api_token ) && true === $this->is_api_token_valid( $breeze_api_token ) ) {
+			$advanced['breeze-api-token'] = sanitize_text_field( $breeze_api_token );
+		} else {
+			$current_token = Breeze_Options_Reader::get_option_value( 'breeze-api-token' );
+			if ( ! empty( $current_token ) ) {
+				$advanced['breeze-api-token'] = sanitize_text_field( $current_token );
+			}
+		}
 
 		breeze_update_option( 'advanced_settings', $advanced, true );
 
@@ -426,12 +737,12 @@ class Breeze_Configuration {
 		wp_send_json( $response );
 	}
 
-    public function is_api_token_valid($provided_token){
-        if ( strlen( $provided_token ) < 32 ) {
-            return false;
-        }
-        return true;
-    }
+	public function is_api_token_valid( $provided_token ) {
+		if ( strlen( $provided_token ) < 32 ) {
+			return false;
+		}
+		return true;
+	}
 
 	/**
 	 *  Save the Heartbeat API settings via Ajax call.
@@ -985,15 +1296,8 @@ class Breeze_Configuration {
 					$wpdb->get_var( $wpdb->prepare( "DELETE FROM $wpdb->options WHERE option_name = %s", $the_timer ) );
 				}
 
-				$is_network = false;
-
-				if ( isset( $_GET['is-network'] ) ) {
-					$is_network = filter_var( $_GET['is-network'], FILTER_VALIDATE_BOOLEAN );
-				}
-
-				if ( isset( $_POST['is-network'] ) ) {
-					$is_network = filter_var( $_POST['is-network'], FILTER_VALIDATE_BOOLEAN );
-				}
+				// Only treat the request as network-scoped for Super Admins.
+				$is_network = breeze_request_wants_network_scope() && breeze_user_can_manage_network();
 
 				if ( is_multisite() && true === $is_network ) {
 					//phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -1439,22 +1743,250 @@ class Breeze_Configuration {
 	// Convert string to array
 	protected function string_convert_arr( $input ) {
 		$output = array();
-		if ( ! empty( $input ) ) {
-			$input = rawurldecode( $input );
-			$input = trim( $input );
-			$input = str_replace( ' ', '', $input );
-			$input = explode( "\n", $input );
 
-			foreach ( $input as $k => $v ) {
-				$output[] = trim( $v );
+		if ( empty( $input ) ) {
+			return $output;
+		}
+
+		$input = rawurldecode( (string) $input );
+		$input = preg_split( '/\R/', $input );
+
+		if ( false === $input ) {
+			return $output;
+		}
+
+		foreach ( $input as $value ) {
+			$value = trim( $value );
+
+			if ( '' === $value ) {
+				continue;
 			}
+
+			$output[] = $value;
 		}
 
 		return $output;
 	}
 
+	/**
+	 * Sanitize HTML double-check selectors.
+	 *
+	 * @param array $selectors Selectors from textarea.
+	 * @return array{
+	 *     selectors: array,
+	 *     normalized_count: int,
+	 *     removed_count: int,
+	 *     removed_root_count: int
+	 * }
+	 */
+	private function sanitize_doublecheck_selectors( array $selectors ): array {
+		return breeze_sanitize_doublecheck_selectors( $selectors );
+	}
+
+	/**
+	 * Build user notice after sanitizing HTML double-check selectors.
+	 *
+	 * @param int $normalized_count Number of corrected selectors.
+	 * @param int $removed_count Number of removed selectors.
+	 * @param int $removed_root_count Number of removed html/body/head targets.
+	 * @return string
+	 */
+	private function get_doublecheck_selectors_notice_message( int $normalized_count, int $removed_count, int $removed_root_count = 0 ): string {
+		$messages = array();
+
+		if ( $normalized_count > 0 ) {
+			$messages[] = sprintf(
+				/* translators: %d: number of corrected selectors */
+				_n(
+					'%d selector was normalized to a valid pattern.',
+					'%d selectors were normalized to valid patterns.',
+					$normalized_count,
+					'breeze'
+				),
+				$normalized_count
+			);
+		}
+
+		if ( $removed_root_count > 0 ) {
+			$messages[] = sprintf(
+				/* translators: %d: number of removed root selectors */
+				_n(
+					'%d selector targeting html, body, or head was removed. Use a descendant selector to refresh content inside those tags.',
+					'%d selectors targeting html, body, or head were removed. Use a descendant selector to refresh content inside those tags.',
+					$removed_root_count,
+					'breeze'
+				),
+				$removed_root_count
+			);
+		}
+
+		if ( $removed_count > 0 ) {
+			$messages[] = sprintf(
+				/* translators: %d: number of removed selectors */
+				_n(
+					'%d invalid entry was removed.',
+					'%d invalid entries were removed.',
+					$removed_count,
+					'breeze'
+				),
+				$removed_count
+			);
+		}
+
+		if ( empty( $messages ) ) {
+			return '';
+		}
+
+		$messages[] = __( 'Only selector chains built from simple selectors (tag, #id, .class) are saved, including descendants and > + ~ combinators.', 'breeze' );
+
+		return implode( ' ', $messages );
+	}
+
+	/**
+	 * Sanitize HTML double-check loader overlay color.
+	 *
+	 * Accept only `#RRGGBB` format to keep generated CSS valid.
+	 *
+	 * @param string $overlay_color Raw overlay color value.
+	 * @return string
+	 */
+	private function sanitize_doublecheck_overlay_color( string $overlay_color ): string {
+		$overlay_color = trim( $overlay_color );
+
+		if ( '' === $overlay_color ) {
+			return '';
+		}
+
+		if ( 1 === preg_match( '/^#[A-Fa-f0-9]{6}$/', $overlay_color ) ) {
+			return $overlay_color;
+		}
+
+		return '';
+	}
+
+	/**
+	 * Sanitize HTML double-check exclude URLs.
+	 *
+	 * @param array $exclude_urls Raw exclude URL list.
+	 * @return array{
+	 *     urls: array,
+	 *     removed_invalid: int,
+	 *     removed_duplicates: int
+	 * }
+	 */
+	private function sanitize_doublecheck_exclude_urls( array $exclude_urls ): array {
+		$sanitized_urls     = array();
+		$seen_urls          = array();
+		$removed_invalid    = 0;
+		$removed_duplicates = 0;
+
+		foreach ( $exclude_urls as $exclude_url ) {
+			$normalized_url = $this->sanitize_single_doublecheck_exclude_url( (string) $exclude_url );
+			if ( '' === $normalized_url ) {
+				++$removed_invalid;
+				continue;
+			}
+
+			if ( isset( $seen_urls[ $normalized_url ] ) ) {
+				++$removed_duplicates;
+				continue;
+			}
+
+			$seen_urls[ $normalized_url ] = true;
+			$sanitized_urls[]             = $normalized_url;
+		}
+
+		return array(
+			'urls'               => $sanitized_urls,
+			'removed_invalid'    => $removed_invalid,
+			'removed_duplicates' => $removed_duplicates,
+		);
+	}
+
+	/**
+	 * Sanitize one HTML double-check exclude URL entry.
+	 *
+	 * Allow:
+	 * - Absolute HTTP(S) URLs.
+	 * - Site-relative paths starting with "/".
+	 *
+	 * @param string $exclude_url Raw exclude URL.
+	 * @return string
+	 */
+	private function sanitize_single_doublecheck_exclude_url( string $exclude_url ): string {
+		$exclude_url = trim( $exclude_url );
+		if ( '' === $exclude_url ) {
+			return '';
+		}
+
+		if ( '/' === $exclude_url[0] ) {
+			$sanitized_path = sanitize_text_field( $exclude_url );
+			if ( 1 === preg_match( '#^/[A-Za-z0-9/_\-\.\~\%\?\=&]*$#', $sanitized_path ) ) {
+				return $sanitized_path;
+			}
+
+			return '';
+		}
+
+		$sanitized_url = esc_url_raw( $exclude_url, array( 'http', 'https' ) );
+		if ( '' === $sanitized_url ) {
+			return '';
+		}
+
+		$site_host = wp_parse_url( home_url(), PHP_URL_HOST );
+		$url_host  = wp_parse_url( $sanitized_url, PHP_URL_HOST );
+		if ( ! is_string( $site_host ) || ! is_string( $url_host ) ) {
+			return '';
+		}
+
+		if ( strtolower( $url_host ) !== strtolower( $site_host ) ) {
+			return '';
+		}
+
+		return $sanitized_url;
+	}
+
+	/**
+	 * Build user notice after sanitizing HTML double-check exclude URLs.
+	 *
+	 * @param int $removed_invalid Number of removed invalid or non-local entries.
+	 * @param int $removed_duplicates Number of removed duplicate entries.
+	 * @return string
+	 */
+	private function get_doublecheck_exclude_urls_notice_message( int $removed_invalid, int $removed_duplicates ): string {
+		$messages = array();
+
+		if ( $removed_invalid > 0 ) {
+			$messages[] = sprintf(
+				/* translators: %d: number of removed invalid entries */
+				_n(
+					'%d exclude URL entry was removed because only local URLs are allowed.',
+					'%d exclude URL entries were removed because only local URLs are allowed.',
+					$removed_invalid,
+					'breeze'
+				),
+				$removed_invalid
+			);
+		}
+
+		if ( $removed_duplicates > 0 ) {
+			$messages[] = sprintf(
+				/* translators: %d: number of removed duplicates */
+				_n(
+					'%d duplicate exclude URL entry was removed.',
+					'%d duplicate exclude URL entries were removed.',
+					$removed_duplicates,
+					'breeze'
+				),
+				$removed_duplicates
+			);
+		}
+
+		return implode( ' ', $messages );
+	}
+
 	//ajax clean cache
-	public static function breeze_clean_cache() {
+	public static function breeze_clean_cache( $dispatch_clear_all_action = true ) {
 		// Check whether we're clearing the cache for one subsite on the network.
 		$is_subsite = is_multisite() && ! is_network_admin();
 
@@ -1478,6 +2010,12 @@ class Breeze_Configuration {
 		//delete all cache
 		Breeze_PurgeCache::breeze_cache_flush( true, true, true );
 
+		// Fire the public purge action so listeners (e.g. the cache preloader)
+		// can react. Callers can disable this to avoid triggering duplicate
+		// full-purge flows when they already handle Varnish/Cloudflare directly.
+		if ( true === (bool) $dispatch_clear_all_action ) {
+			do_action( 'breeze_clear_all_cache' );
+		}
 		return $result;
 	}
 
@@ -1713,7 +2251,7 @@ class Breeze_Configuration {
 	 * @return string
 	 * @throws Exception
 	 */
-    public static function breeze_generate_token( $length = 32 ){
+	public static function breeze_generate_token( $length = 32 ) {
 		$characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 		$token      = '';
 
@@ -1769,13 +2307,16 @@ class Breeze_Configuration {
 	public static function reset_to_default_ajax() {
 		breeze_is_restricted_access();
 		check_ajax_referer( '_breeze_reset_default', 'security' );
+		// set_as_network_screen() routes the reset to the current site when
+		// the current user is not operating at the network scope.
 		set_as_network_screen();
 
-		$is_blog_id = 0;
-		if ( true === filter_var( $_POST['is-network'], FILTER_VALIDATE_BOOLEAN ) ) {
+		$is_blog_id     = 0;
+		$is_network_req = breeze_request_wants_network_scope() && breeze_user_can_manage_network();
+		if ( true === $is_network_req ) {
 			$is_blog_id = 'network';
 		}
-		$response = self::reset_to_default( $is_blog_id, $_POST['is-network'] );
+		$response = self::reset_to_default( $is_blog_id, $is_network_req ? 'true' : 'false' );
 		wp_send_json( $response );
 	}
 
@@ -1821,27 +2362,33 @@ class Breeze_Configuration {
 
 		// Default File
 		$default_file = array(
-			'breeze-minify-html'       => '0',
+			'breeze-enable-html-cache'             => '1',
+			'breeze-html-doublecheck'              => '0',
+			'breeze-doublecheck-elements'          => array(),
+			'breeze-doublecheck-elements-error'    => '',
+			'breeze-doublecheck-exclude-url-error' => '',
+			'breeze-doublecheck-load'              => 'async',
+			'breeze-minify-html'                   => '0',
 			// --
-			'breeze-minify-css'        => '0',
-			'breeze-font-display-swap' => '0',
-			'breeze-group-css'         => '0',
-			'breeze-exclude-css'       => array(),
+			'breeze-minify-css'                    => '0',
+			'breeze-font-display-swap'             => '0',
+			'breeze-group-css'                     => '0',
+			'breeze-exclude-css'                   => array(),
 			// --
-			'breeze-minify-js'         => '0',
-			'breeze-group-js'          => '0',
-			'breeze-include-inline-js' => '0',
-			'breeze-exclude-js'        => array(),
-			'breeze-move-to-footer-js' => array(),
-			'breeze-defer-js'          => array(),
-			'breeze-enable-js-delay'   => '0',
-			'no-breeze-no-delay-js'    => array(),
-			'breeze-delay-all-js'      => '0',
+			'breeze-minify-js'                     => '0',
+			'breeze-group-js'                      => '0',
+			'breeze-include-inline-js'             => '0',
+			'breeze-exclude-js'                    => array(),
+			'breeze-move-to-footer-js'             => array(),
+			'breeze-defer-js'                      => array(),
+			'breeze-enable-js-delay'               => '0',
+			'no-breeze-no-delay-js'                => array(),
+			'breeze-delay-all-js'                  => '0',
 		);
 
 		$file = $default_file;
 
-        $token      = Breeze_Configuration::breeze_generate_token();
+		$token = Breeze_Configuration::breeze_generate_token();
 
 		// Default Advanced
 		$default_advanced  = array(
@@ -1910,9 +2457,12 @@ class Breeze_Configuration {
 
 		// Preload default
 		$default_preload = array(
-			'breeze-preload-fonts' => array(),
-			'breeze-preload-links' => '1',
-			'breeze-prefetch-urls' => array(),
+			'breeze-preload-fonts'            => array(),
+			'breeze-preload-links'            => '1',
+			'breeze-prefetch-urls'            => array(),
+			'breeze-cache-warmup-enabled'     => '0',
+			'breeze-preload-cache-urls'       => array(),
+			'breeze-preload-cache-urls-error' => '',
 		);
 		$preload         = $default_preload;
 
@@ -2004,7 +2554,7 @@ class Breeze_Configuration {
 		} elseif ( 'network' === $blog_id ) { // Multisite network
 			$blogs = get_sites( array( 'number' => 0 ) );
 			foreach ( $blogs as $blog ) {
-				switch_to_blog( $blog_id );
+				switch_to_blog( $blog->blog_id );
 				//automatic config start cache
 				Breeze_ConfigCache::factory()->write();
 				Breeze_ConfigCache::factory()->write_config_cache();
@@ -2032,7 +2582,6 @@ class Breeze_Configuration {
 
 		return true;
 	}
-
 }
 
 //init configuration object
