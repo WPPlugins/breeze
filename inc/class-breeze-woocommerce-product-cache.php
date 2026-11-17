@@ -29,7 +29,6 @@ class Breeze_Woocommerce_Product_Cache {
 	 * @since 1.1.10
 	 */
 	public function recreate_cache_for_products( $order_id, $posted_data, $order ) {
-
 		if ( ! empty( $order_id ) ) {
 
 			// Checks if the Varnish server is ON.
@@ -56,10 +55,24 @@ class Breeze_Woocommerce_Product_Cache {
 
 			if ( ! empty( $items ) ) {
 				foreach ( $items as $item_id => $item_product ) {
-					$product_id       = $item_product->get_product_id();
-					$product_id       = absint( $product_id );
-					$product          = wc_get_product( $product_id );
-					$stock_no         = intval( $product->get_stock_quantity() ) - 1;
+
+					$product_id = $item_product->get_product_id();
+					if ( ! is_numeric( $product_id ) ) {
+						continue;
+					}
+					$product_id = absint( $product_id );
+					$product    = wc_get_product( $product_id );
+
+					if ( ! is_object( $product ) || ! $product instanceof WC_Product ) {
+						continue;
+					}
+
+					$get_stock_quantity = $product->get_stock_quantity();
+					$stock_no           = 0;
+					if ( is_numeric( $get_stock_quantity ) ) {
+						$stock_no = intval( $get_stock_quantity ) - 1;
+					}
+
 					$product_archives = array();
 
 					if ( true === $product->managing_stock() && 1 > $stock_no ) { // if stock is 0
@@ -86,10 +99,10 @@ class Breeze_Woocommerce_Product_Cache {
 
 				if ( ! empty( $archive_urls ) ) {
 					foreach ( $archive_urls as $url ) {
-						global $wp_filesystem;
+						$wp_filesystem = breeze_get_filesystem();
 						// Clear the cache for the product page.
-						if ( $wp_filesystem->exists( breeze_get_cache_base_path() . md5( $url ) ) ) {
-							$wp_filesystem->rmdir( breeze_get_cache_base_path() . md5( $url ), true );
+						if ( $wp_filesystem->exists( breeze_get_cache_base_path() . hash( 'sha256', $url ) ) ) {
+							$wp_filesystem->rmdir( breeze_get_cache_base_path() . hash( 'sha256', $url ), true );
 						}
 						// Clear Varnish server cache for this URL.
 						breeze_varnish_purge_cache( $url, $do_varnish_purge );
@@ -110,11 +123,12 @@ class Breeze_Woocommerce_Product_Cache {
 
 				if ( ! empty( $product_list_cd ) ) {
 					// Clear Cloudflare cache for the product URLs.
-					Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $product_list_cd );
+					// Purge type: 'default', 'cron'
+					$cf_purge_type = apply_filters( 'breeze_cf_purge_type_on_order_update', 'cron' );
+					Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $product_list_cd, $cf_purge_type );
 				}
 			}
 		}
-
 	}
 
 	/**
@@ -170,5 +184,3 @@ add_action(
 		}
 	}
 );
-
-

@@ -24,10 +24,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Breeze_PurgeCache {
 
+	/**
+	 * Temporary page/post/cpt ID list of already cache cleared.
+	 */
+	private array $cleared_extra_items = array();
+	/**
+	 * An array to store purged CF posts.
+	 */
+	private static array $purged_cf_posts = array();
+	/**
+	 * Post statuses as they were before the current update, keyed by post ID.
+	 */
+	private static array $pre_update_status = array();
+	/**
+	 * Permalinks of publicly viewable posts as they were before the current update, keyed by post ID.
+	 */
+	private static array $pre_update_permalink = array();
+
 	public function set_action() {
+		add_action( 'pre_post_update', array( $this, 'store_pre_update_status' ), 1, 1 );
 		add_action( 'pre_post_update', array( $this, 'purge_post_on_update' ), 10, 1 );
 		add_action( 'save_post', array( $this, 'purge_post_on_update' ), 10, 1 );
 		add_action( 'save_post', array( $this, 'purge_post_on_update_content' ), 9, 3 );
+
 		add_action( 'edited_term', array( $this, 'purge_term_on_update' ), 9, 3 );
 		add_action( 'wp_trash_post', array( $this, 'purge_post_on_update' ), 10, 1 );
 		add_action( 'wp_trash_post', array( $this, 'purge_post_on_trash' ), 9, 1 );
@@ -40,6 +59,60 @@ class Breeze_PurgeCache {
 
 		add_action( 'switch_theme', array( &$this, 'clear_local_cache_on_switch' ), 9, 3 );
 		add_action( 'customize_save_after', array( &$this, 'clear_customizer_cache' ), 11, 1 );
+		add_action( 'purge_post_cache', array( $this, 'purge_post_cache' ), 10, 1 );
+
+		// Purge full cache when navigation menus are created, updated or deleted.
+		// Menus typically appear sitewide, so a full purge is the safest option.
+		add_action( 'wp_update_nav_menu', array( &$this, 'clear_cache_on_menu_change' ), 10, 1 );
+		add_action( 'wp_create_nav_menu', array( &$this, 'clear_cache_on_menu_change' ), 10, 1 );
+		add_action( 'wp_delete_nav_menu', array( &$this, 'clear_cache_on_menu_change' ), 10, 1 );
+	}
+
+	/**
+	 * Detects pages with the latest comments block and clears their cache.
+	 *
+	 * This method scans the content of published posts to find pages that contain
+	 * the latest comments block (`<!-- wp:latest-comments -->`). If such pages are found,
+	 * it purges their Cloudflare cache and removes local cache files.
+	 *
+	 * @return void
+	 */
+	private function detect_comments_page_clear_cache(): void {
+		global $wpdb;
+
+		$query = "SELECT ID
+			FROM `$wpdb->posts`
+			WHERE post_content LIKE '%<!-- wp:latest-comments %>'
+			AND post_status = 'publish'";
+
+		$results = $wpdb->get_results( $query ); // phpcs:ignore
+
+		$pages_list = array();
+
+		if ( $results ) {
+			foreach ( $results as $result ) {
+				$page_id       = $result->ID;
+				$get_permalink = get_permalink( $page_id );
+				if ( false !== $get_permalink && ! in_array( $page_id, $this->cleared_extra_items, true ) ) {
+					$pages_list[]                = $get_permalink;
+					$this->cleared_extra_items[] = $page_id;
+				}
+			}
+		}
+
+		if ( ! empty( $pages_list ) ) {
+			// CLear Cloudflare, if enabled.
+			Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $pages_list );
+
+			// Remove local cache file and purge Varnish.
+			$varnish = new Breeze_PurgeVarnish();
+			foreach ( $pages_list as $url_path ) {
+				$this->clear_local_cache_for_urls( array( $url_path ) );
+
+				$item_url = untrailingslashit( $url_path ) . '/?breeze';
+				$varnish->purge_cache( $item_url );
+			}
+		}
 	}
 
 	/**
@@ -49,8 +122,25 @@ class Breeze_PurgeCache {
 	 *
 	 * @return void
 	 */
+	
 	public function clear_customizer_cache( $element ) {
 
+		do_action( 'breeze_clear_all_cache' );
+	}
+
+	/**
+	 * Clear all cache when a navigation menu is created, updated or deleted.
+	 *
+	 * Navigation menus usually render on every page (header/footer), so any
+	 * change to a menu can invalidate the cached HTML for the whole site.
+	 * Triggers `breeze_clear_all_cache` so local, Varnish and Cloudflare
+	 * cache layers are all flushed.
+	 *
+	 * @param int $menu_id The ID of the menu that was changed.
+	 *
+	 * @return void
+	 */
+	public function clear_cache_on_menu_change( $menu_id ) {
 		do_action( 'breeze_clear_all_cache' );
 	}
 
@@ -67,7 +157,7 @@ class Breeze_PurgeCache {
 		//delete minify
 		Breeze_MinificationCache::clear_minification();
 		//clear normal cache
-		Breeze_PurgeCache::breeze_cache_flush();
+		Breeze_PurgeCache::breeze_cache_flush( true, true, true );
 		//do_action( 'breeze_clear_all_cache' );
 	}
 
@@ -89,13 +179,28 @@ class Breeze_PurgeCache {
 		}
 	}
 
+	/**
+	 * Record the status and permalink a post had before it was updated.
+	 *
+	 * @param int $post_id Post ID.
+	 *
+	 * @return void
+	 */
+	public function store_pre_update_status( $post_id ) {
+		self::$pre_update_status[ $post_id ] = get_post_status( $post_id );
+		// Only a viewable post can have a cached page. Trashing renames the slug to
+		// "slug__trashed" before this hook runs, but the page was cached without it.
+		self::$pre_update_permalink[ $post_id ] = is_post_status_viewable( self::$pre_update_status[ $post_id ] )
+			? str_replace( '__trashed', '', get_permalink( $post_id ) )
+			: '';
+	}
+
 	//    Automatically purge all file based page cache on post changes
 	public function purge_post_on_update( $post_id ) {
+
 		$post_type = get_post_type( $post_id );
 
 		if ( ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) || 'revision' === $post_type ) {
-			return;
-		} elseif ( ! current_user_can( 'edit_post', $post_id ) && ( ! defined( 'DOING_CRON' ) || ! DOING_CRON ) ) {
 			return;
 		}
 
@@ -104,7 +209,8 @@ class Breeze_PurgeCache {
 			$do_cache_reset = false;
 		}
 		$clear_wp_cache = true;
-		if ( defined( 'RedisCachePro\Version' ) ) {
+
+		if ( true === self::is_pro_plugin_ob_cache_enabled() ) {
 			$clear_wp_cache = false;
 		}
 
@@ -118,18 +224,110 @@ class Breeze_PurgeCache {
 		}
 	}
 
-	//    Automatically purge all file based term cache on post changes
-	public function purge_term_on_update() {
+	/**
+	 * Programmatically purge cache for a specific post.
+	 *
+	 * This function can be called directly using:
+	 * do_action('purge_post_cache', $post_id);
+	 *
+	 * @param int $post_id The ID of the post to purge cache for.
+	 *
+	 * @return void
+	 */
+	public function purge_post_cache( $post_id ) {
 
-		$do_cache_reset = true;
+		// Validate post ID
+		if ( empty( $post_id ) || ! is_numeric( $post_id ) ) {
+			return;
+		}
+
+		$post_type = get_post_type( $post_id );
+
+		// Skip if post doesn't exist or is a revision
+		if ( false === $post_type || 'revision' === $post_type ) {
+			return;
+		}
+
+		// File based caching only
+		if ( ! empty( Breeze_Options_Reader::get_option_value( 'breeze-active' ) ) ) {
+			// Collect all URLs related to this post
+			$list_of_urls = self::collect_urls_for_cache_purge( $post_id );
+
+			if ( ! empty( $list_of_urls ) ) {
+				// Remove homepage from the purge list (both with and without trailing slash)
+				$homepage_with_slash = trailingslashit( home_url() );
+				$homepage_without_slash = untrailingslashit( home_url() );
+				$list_of_urls = array_filter( $list_of_urls, function( $url ) use ( $homepage_with_slash, $homepage_without_slash ) {
+					$trimmed_url = trim( $url );
+					return $trimmed_url !== $homepage_with_slash && $trimmed_url !== $homepage_without_slash;
+				} );
+
+				if ( ! empty( $list_of_urls ) ) {
+					// Purge local cache for the URLs list
+					$this->clear_local_cache_for_urls( $list_of_urls );
+					// Purge Cloudflare cache
+					Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $list_of_urls );
+					// Purge Varnish cache
+					$purge_urls = array();
+					foreach ( $list_of_urls as $url_path ) {
+						// The archive path purge already covers its paginated URLs.
+						if ( self::is_paginated_url( $url_path ) ) {
+							continue;
+						}
+						$purge_urls[] = untrailingslashit( $url_path ) . '/?breeze';
+					}
+
+					self::purge_varnish_urls( array_unique( $purge_urls ) );
+				}
+			}
+
+			// Also clear object cache if needed
+			$clear_wp_cache = true;
+			if ( true === self::is_pro_plugin_ob_cache_enabled() ) {
+				$clear_wp_cache = false;
+			}
+
+			$do_cache_reset = true;
+			if ( 'tribe_events' === $post_type ) {
+				$do_cache_reset = false;
+			}
+
+			// Set global post for breeze_cache_flush if needed
+			global $post;
+			$original_post = $post;
+			$post = get_post( $post_id );
+			
+			self::breeze_cache_flush( $do_cache_reset, $clear_wp_cache );
+			
+			// Restore original post
+			$post = $original_post;
+		}
+	}
+
+	/**
+	 * Purges cache related to a term when it is updated.
+	 *
+	 * This method handles clearing object cache and file-based caching mechanisms
+	 * for the specified term. It ensures cache consistency across term updates
+	 * based on plugin configuration and active caching mechanisms.
+	 *
+	 * @param int $term_id The ID of the term being updated.
+	 * @param int $tt_id The term taxonomy ID associated with the term.
+	 * @param string $taxonomy The taxonomy name of the term being updated.
+	 *
+	 * @return void
+	 */
+	public function purge_term_on_update( int $term_id, int $tt_id, string $taxonomy ) {
+
 		$clear_wp_cache = true;
-		if ( defined( 'RedisCachePro\Version' ) ) {
+		if ( true === self::is_pro_plugin_ob_cache_enabled() ) {
 			$clear_wp_cache = false;
 		}
 
 		// File based caching only
 		if ( ! empty( Breeze_Options_Reader::get_option_value( 'breeze-active' ) ) ) {
-			self::breeze_cache_flush( $do_cache_reset, $clear_wp_cache );
+			self::clear_op_cache_for_terms( $term_id, $tt_id, $taxonomy );
+			self::breeze_cache_flush( true, $clear_wp_cache );
 		}
 	}
 
@@ -147,18 +345,98 @@ class Breeze_PurgeCache {
 	public function purge_post_on_update_content( int $post_id, WP_Post $post, bool $update ) {
 		if ( true === $update ) {
 
+			// Prevent multiple purges for the same post in one request
+			if ( in_array( $post_id, self::$purged_cf_posts, true ) ) {
+				return;
+			}
+			self::$purged_cf_posts[] = $post_id;
+
 			$post_type = get_post_type( $post_id );
 
 			if ( ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) || 'revision' === $post_type ) {
 				return;
-			} elseif ( ! current_user_can( 'edit_post', $post_id ) && ( ! defined( 'DOING_CRON' ) || ! DOING_CRON ) ) {
+			}
+
+			// Read before collect_urls_for_cache_purge() clears it.
+			$pre_update_permalink = self::$pre_update_permalink[ $post_id ] ?? '';
+			$list_of_urls         = self::collect_urls_for_cache_purge( $post_id );
+
+			if ( ! empty( $list_of_urls ) ) {
+				// Purge local cache for the URLs list.
+				$this->clear_local_cache_for_urls( $list_of_urls );
+				// Purge CF cache.
+				// Purge type: 'default', 'cron'
+				$cf_purge_type = apply_filters( 'breeze_cf_purge_type_on_post_update', 'cron' );
+				Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $list_of_urls, $cf_purge_type );
+				// Purge Varnish cache for all URLs including taxonomy archives.
+				$purge_urls = array();
+				foreach ( $list_of_urls as $url_path ) {
+					// Skip paginated URLs: the archive path purge below is a wildcard
+					// PURGE that already covers /page/N/ and ?page=N. Sending one
+					// request per page exhausts PHP-FPM on large catalogues.
+					if ( self::is_paginated_url( $url_path ) ) {
+						continue;
+					}
+					$purge_urls[] = ( false !== strpos( $url_path, '?' ) ) ? $url_path : untrailingslashit( $url_path ) . '/?breeze';
+				}
+
+				// Both slash variants of a term archive normalise to one purge URL,
+				// so dedupe here rather than on the raw list.
+				self::purge_varnish_urls( array_unique( $purge_urls ) );
+
+				// The queued purge can run a minute or more later, so a post taken out of
+				// public view is purged from Varnish right away.
+				if ( $pre_update_permalink && ! is_post_status_viewable( $post->post_status ) ) {
+					$has_query = false !== strpos( $pre_update_permalink, '?' );
+					( new Breeze_PurgeVarnish() )->purge_cache( $has_query ? $pre_update_permalink : $pre_update_permalink . '?breeze' );
+				}
+			}
+		}
+	}
+
+	/**
+	 * Purge Varnish for a batch of URLs. Queued off-request when possible, since each
+	 * purge is a blocking round trip and a batch can add tens of seconds to save_post.
+	 *
+	 * Also serves as the queue callback, hence the doing_action() check. The queued
+	 * action carries a transient key rather than the URLs themselves, because Action
+	 * Scheduler rejects args longer than 8000 characters as JSON.
+	 *
+	 * @param array|string $purge_urls Normalised purge URLs, or a transient key.
+	 *
+	 * @return void
+	 */
+	public static function purge_varnish_urls( $purge_urls ) {
+		if ( is_string( $purge_urls ) ) {
+			$transient_key = $purge_urls;
+			$purge_urls    = get_transient( $transient_key );
+			delete_transient( $transient_key );
+		}
+
+		// array_filter also covers an expired transient, which reads back as false.
+		$purge_urls = array_values( array_filter( (array) $purge_urls ) );
+
+		if ( empty( $purge_urls ) ) {
+			return;
+		}
+
+		if ( ! doing_action( 'breeze_purge_varnish_urls' ) && function_exists( 'as_enqueue_async_action' ) ) {
+			$transient_key = 'breeze_purge_' . md5( wp_json_encode( $purge_urls ) . microtime() );
+			set_transient( $transient_key, $purge_urls, HOUR_IN_SECONDS );
+			$action_id = as_enqueue_async_action( 'breeze_purge_varnish_urls', array( $transient_key ), 'breeze' );
+
+			// A queued action replays this method. A 0 means the queue refused it.
+			if ( 0 !== (int) $action_id ) {
 				return;
 			}
 
-			$this->purge_cloudflare_cache( $post_id );
-
+			delete_transient( $transient_key );
 		}
 
+		$varnish = new Breeze_PurgeVarnish();
+		foreach ( $purge_urls as $item_url ) {
+			$varnish->purge_cache( $item_url );
+		}
 	}
 
 	/**
@@ -169,13 +447,21 @@ class Breeze_PurgeCache {
 	 * @return void
 	 */
 	public function purge_post_on_trash( int $post_id ) {
-		$this->purge_cloudflare_cache( $post_id );
+		$list_of_urls = self::collect_urls_for_cache_purge( $post_id );
+
+		if ( ! empty( $list_of_urls ) ) {
+			// Purge local cache for the URLs list.
+			$this->clear_local_cache_for_urls( $list_of_urls );
+			// Purge CF cache.
+			Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $list_of_urls );
+		}
 	}
 
-	private function purge_cloudflare_cache( $post_id ) {
+	public static function collect_urls_for_cache_purge( $post_id ): array {
 
 		if ( false === get_permalink( $post_id ) ) {
-			return;
+			unset( self::$pre_update_status[ $post_id ], self::$pre_update_permalink[ $post_id ] );
+			return array();
 		}
 		// Reset CloudFlare cache.
 		$get_permalink = get_permalink( $post_id );
@@ -190,6 +476,26 @@ class Breeze_PurgeCache {
 		$this_post_type      = get_post_type( $post_id );
 		$rest_api_route      = 'wp/v2';
 		$valid_post_status   = array( 'publish', 'private', 'trash' );
+
+		// Scheduled, draft and pending posts were never publicly reachable, so there is
+		// nothing cached for them. A post being unpublished still needs its old public
+		// URLs cleared, hence the status captured before the update.
+		$was_public = isset( self::$pre_update_status[ $post_id ] )
+			&& in_array( self::$pre_update_status[ $post_id ], $valid_post_status, true );
+		$pre_update_permalink = self::$pre_update_permalink[ $post_id ] ?? '';
+		// The pre-update status and permalink are only needed here.
+		unset( self::$pre_update_status[ $post_id ], self::$pre_update_permalink[ $post_id ] );
+
+		if ( ! $was_public && ! in_array( $this_post_status, $valid_post_status, true ) ) {
+			return array();
+		}
+
+		// A post taken out of public view now gets the plain ?p=ID permalink, but its
+		// page was cached under the permalink it had before this update.
+		if ( $pre_update_permalink && ! is_post_status_viewable( $this_post_status ) ) {
+			$get_permalink = $pre_update_permalink;
+			$list_of_urls  = array( $get_permalink );
+		}
 
 		$post_type_object = get_post_type_object( $this_post_type );
 		if ( isset( $post_type_object->rest_base ) && ! empty( $post_type_object->rest_base ) ) {
@@ -207,7 +513,7 @@ class Breeze_PurgeCache {
 		if ( function_exists( 'amp_get_permalink' ) ) {
 			$list_of_urls[] = amp_get_permalink( $post_id );
 			// Regular AMP url for posts
-			$list_of_urls[] = get_permalink( $post_id ) . 'amp/';
+			$list_of_urls[] = $get_permalink . 'amp/';
 		}
 		if ( 'trash' === $this_post_status ) {
 			$list_of_urls[] = $get_permalink . 'feed/';
@@ -224,11 +530,18 @@ class Breeze_PurgeCache {
 		$categories = get_the_category( $post_id );
 		if ( $categories ) {
 			foreach ( $categories as $cat ) {
+				$category_link        = get_category_link( $cat->term_id );
+				$category_link_no_cat = str_replace( 'category/', '', $category_link );
+				if ( ! empty( $category_link ) && $category_link !== $category_link_no_cat ) {
+					array_push( $list_of_urls, $category_link_no_cat );
+				}
+
 				array_push(
 					$list_of_urls,
-					get_category_link( $cat->term_id ),
+					$category_link,
 					get_rest_url() . $rest_api_route . '/categories/' . $cat->term_id . '/'
 				);
+				$category_link = '';
 			}
 		}
 
@@ -245,7 +558,8 @@ class Breeze_PurgeCache {
 
 		// Archives and their feeds
 		if ( $this_post_type && ! in_array( $this_post_type, $noarchive_post_type, true ) ) {
-			$get_archive_link      = get_post_type_archive_link( get_post_type( $post_id ) );
+			$get_archive_link = get_post_type_archive_link( get_post_type( $post_id ) );
+
 			$get_archive_feed_link = get_post_type_archive_feed_link( get_post_type( $post_id ) );
 			if ( ! empty( $get_archive_link ) ) {
 				$list_of_urls[] = $get_archive_link;
@@ -269,7 +583,6 @@ class Breeze_PurgeCache {
 		array_push(
 			$list_of_urls,
 			get_rest_url(),
-			trailingslashit( home_url() )
 		);
 		if ( 'page' === get_option( 'show_on_front' ) ) {
 			// Ensure we have a page_for_posts setting to avoid empty URL
@@ -278,11 +591,195 @@ class Breeze_PurgeCache {
 			}
 		}
 
-		Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $list_of_urls );
+		// Trim all URLs in the list to ensure clean output
+		$list_of_urls = array_map( 'trim', $list_of_urls );
+
+		$homepage = trailingslashit( home_url() );
+		if ( ! in_array( $homepage, $list_of_urls, true ) ) {
+			// Clear the cache for homepage
+			$list_of_urls[] = $homepage;
+		}
+
+		// Custom taxonomy purging
+		$post = get_post( $post_id );
+		if ( $post ) {
+			$taxonomies = get_object_taxonomies( $post );
+			foreach ( $taxonomies as $tax_slug ) {
+				$taxonomy_object = get_taxonomy( $tax_slug );
+				// Only public taxonomies have a front-end archive that can be cached.
+				if ( empty( $taxonomy_object ) || empty( $taxonomy_object->public ) ) {
+					continue;
+				}
+
+				$terms = get_the_terms( $post_id, $tax_slug );
+				if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
+					foreach ( $terms as $term ) {
+						$term_link = get_term_link( $term );
+						if ( ! is_wp_error( $term_link ) && ! empty( $term_link ) ) {
+							// Add both slash variants: the local cache key is the raw request
+							// URL, which may or may not carry a trailing slash depending on the
+							// site permalink structure.
+							$list_of_urls[] = trailingslashit( $term_link );
+							$list_of_urls[] = untrailingslashit( $term_link );
+						}
+					}
+				}
+			}
+		}
+
+		// WooCommerce product archives: purge shop/category/tag pagination
+		// for both /page/N/ and ?page=N (covers manual admin saves and REST).
+		if ( 'product' === $this_post_type && class_exists( 'WooCommerce' ) ) {
+			$list_of_urls = array_merge( $list_of_urls, self::collect_product_paginated_urls( $post_id ) );
+		}
+
+		/**
+		 * Filter the list of URLs to be purged.
+		 * @param array $list_of_urls The current list of URLs.
+		 * @param int    $post_id      The ID of the post being updated.
+		 */
+		$list_of_urls = apply_filters( 'breeze_collect_urls_for_cache_purge', $list_of_urls, $post_id );
+
+		return array_unique( $list_of_urls );
 	}
 
+	/**
+	 * Collect shop / product_cat / product_tag paginated URLs for a product.
+	 *
+	 * Includes pretty permalinks (/page/2/) and query-string pagination (?page=2).
+	 *
+	 * @param int $product_id Product post ID.
+	 *
+	 * @return array
+	 */
+	public static function collect_product_paginated_urls( $product_id ): array {
+		$urls = array();
+
+		if ( ! class_exists( 'WooCommerce' ) || empty( $product_id ) ) {
+			return $urls;
+		}
+
+		$per_page = (int) apply_filters( 'loop_shop_per_page', wc_get_default_products_per_row() * wc_get_default_product_rows_per_page() );
+		if ( $per_page < 1 ) {
+			$per_page = (int) get_option( 'posts_per_page', 10 );
+		}
+
+		$product_categories = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'all' ) );
+		if ( ! empty( $product_categories ) && ! is_wp_error( $product_categories ) ) {
+			foreach ( $product_categories as $cat ) {
+				$category_url = get_term_link( $cat->term_id, 'product_cat' );
+				if ( ! is_wp_error( $category_url ) ) {
+					$urls = array_merge( $urls, self::collect_paginated_urls( $category_url, (int) $cat->count, $per_page ) );
+				}
+			}
+		}
+
+		$product_tags = wp_get_post_terms( $product_id, 'product_tag', array( 'fields' => 'all' ) );
+		if ( ! empty( $product_tags ) && ! is_wp_error( $product_tags ) ) {
+			foreach ( $product_tags as $tag ) {
+				$tag_url = get_term_link( $tag->term_id, 'product_tag' );
+				if ( ! is_wp_error( $tag_url ) ) {
+					$urls = array_merge( $urls, self::collect_paginated_urls( $tag_url, (int) $tag->count, $per_page ) );
+				}
+			}
+		}
+
+		$shop_url = wc_get_page_permalink( 'shop' );
+		if ( $shop_url ) {
+			$product_counts = wp_count_posts( 'product' );
+			$shop_total     = isset( $product_counts->publish ) ? (int) $product_counts->publish : 0;
+			$urls           = array_merge( $urls, self::collect_paginated_urls( $shop_url, $shop_total, $per_page ) );
+		}
+
+		return $urls;
+	}
+
+	/**
+	 * Is this a paginated archive URL (?page=N or /page/N/)?
+	 *
+	 * Varnish covers these with a single wildcard PURGE on the archive path,
+	 * so they must not be dispatched one request per page.
+	 *
+	 * @param string $url URL to test.
+	 *
+	 * @return bool
+	 */
+	public static function is_paginated_url( $url ): bool {
+		return (bool) preg_match( '#([?&]page=|/page/)#', (string) $url );
+	}
+
+	/**
+	 * Build paginated archive URLs for a base archive URL.
+	 *
+	 * Includes both pretty permalinks (/page/2/) and query-string pagination (?page=2).
+	 *
+	 * @param string $base_url    Base archive URL.
+	 * @param int    $total_items Number of items in the archive.
+	 * @param int    $per_page    Items shown per page.
+	 *
+	 * @return array
+	 */
+	public static function collect_paginated_urls( $base_url, $total_items, $per_page ): array {
+		$urls = array();
+
+		if ( empty( $base_url ) ) {
+			return $urls;
+		}
+
+		if ( $per_page < 1 ) {
+			$per_page = 10;
+		}
+
+		// +1 buffer purges the page a just-removed item may have lived on.
+		$total_pages = (int) ceil( max( 0, $total_items ) / $per_page ) + 1;
+
+		// Hard cap: large catalogues would otherwise generate thousands of purge requests.
+		$max_pages   = max( 1, (int) apply_filters( 'breeze_max_paginated_purge_pages', 20 ) );
+		$total_pages = min( $total_pages, $max_pages );
+
+		$base_no_slash = untrailingslashit( $base_url );
+		$base_slash    = trailingslashit( $base_no_slash );
+
+		// ?page=1 variants — some themes keep this on the first archive page.
+		$urls[] = $base_no_slash . '?page=1';
+		$urls[] = $base_slash . '?page=1';
+
+		for ( $n = 2; $n <= $total_pages; $n++ ) {
+			// Pretty permalinks: /store/page/3/
+			$urls[] = $base_slash . 'page/' . $n . '/';
+			// Query-string pagination: /store?page=3 and /store/?page=3
+			$urls[] = $base_no_slash . '?page=' . $n;
+			$urls[] = $base_slash . '?page=' . $n;
+		}
+
+		return $urls;
+	}
+
+	/**
+	 * Clears the local cache for the specified URLs.
+	 *
+	 * @param array $list_of_urls An array of URLs for which the local cache should be cleared.
+	 *
+	 * @return void
+	 */
+	private function clear_local_cache_for_urls( array $list_of_urls ) {
+		breeze_purge_local_cache_for_urls( $list_of_urls, breeze_get_cache_base_path() );
+	}
+
+	/**
+	 * Purges the cache for a post associated with a newly approved comment.
+	 *
+	 * This method is triggered when a new comment is added and approved, handling cache
+	 * clearing for the related post using file-based caching and Cloudflare integration.
+	 *
+	 * @param int $comment_ID The ID of the new comment.
+	 * @param int|string $approved Approval status of the comment. Non-zero value indicates approval.
+	 * @param array $commentdata An array of comment data including the ID of the associated post.
+	 *
+	 * @return void
+	 */
 	public function purge_post_on_new_comment( $comment_ID, $approved, $commentdata ) {
-		if ( empty( $approved ) ) {
+		if ( 1 !== $approved ) {
 			return;
 		}
 		// File based caching only
@@ -291,40 +788,40 @@ class Breeze_PurgeCache {
 
 			Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( array( get_permalink( $post_id ) ) );
 
-			global $wp_filesystem;
-
-			if ( empty( $wp_filesystem ) ) {
-				require_once( ABSPATH . '/wp-admin/includes/file.php' );
-				WP_Filesystem();
-			}
-
 			$url_path = get_permalink( $post_id );
-			if ( $wp_filesystem->exists( breeze_get_cache_base_path() . md5( $url_path ) ) ) {
-				$wp_filesystem->rmdir( breeze_get_cache_base_path() . md5( $url_path ), true );
-			}
+			// Purge local cache for the URLs list.
+			$this->clear_local_cache_for_urls( array( $url_path ) );
+
+			$this->detect_comments_page_clear_cache();
+			$this->clear_op_cache_for_comments( $comment_ID );
 		}
 	}
 
-	//            if a comments status changes, purge it's parent posts cache
-	public function purge_post_on_comment_status_change( $comment_ID, $comment_status ) {
+	/**
+	 * Purges the post associated with a comment when the comment's status changes.
+	 *
+	 * This method is triggered to handle cache clearing for posts related to comments,
+	 * based on file-based caching settings and configurations specific to Breeze.
+	 *
+	 * @param int $comment_ID The ID of the comment whose status has changed.
+	 * @param mixed $comment_status The new status of the comment.
+	 *
+	 * @return void
+	 */
+	public function purge_post_on_comment_status_change( int $comment_ID, $comment_status ) {
 		// File based caching only
 		if ( ! empty( Breeze_Options_Reader::get_option_value( 'breeze-active' ) ) ) {
 			$comment = get_comment( $comment_ID );
 			if ( ! empty( $comment ) ) {
 				$post_id = $comment->comment_post_ID;
 
-				global $wp_filesystem;
-
-				WP_Filesystem();
-
 				$url_path = get_permalink( $post_id );
-
 				Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( array( $url_path ) );
-
-				if ( $wp_filesystem->exists( breeze_get_cache_base_path() . md5( $url_path ) ) ) {
-					$wp_filesystem->rmdir( breeze_get_cache_base_path() . md5( $url_path ), true );
-				}
+				$this->clear_local_cache_for_urls( array( $url_path ) );
 			}
+
+			$this->detect_comments_page_clear_cache();
+			$this->clear_op_cache_for_comments( $comment_ID );
 		}
 	}
 
@@ -336,19 +833,26 @@ class Breeze_PurgeCache {
 	 *
 	 * @return void
 	 */
-	public static function breeze_cache_flush( $flush_cache = true, $clear_ocp = true ) {
-		global $wp_filesystem, $post;
+	public static function breeze_cache_flush( $flush_cache = true, $clear_ocp = true, $purge_all_html_folder = false ) {
+		global $post;
+
+		$post_id = null;
+		if ( $post instanceof WP_Post ) {
+			$post_id = $post->ID;
+		}
+
 		if ( true === Breeze_CloudFlare_Helper::is_log_enabled() ) {
 			error_log( '######### PURGE LOCAL CACHE HTML ###: ' . var_export( 'true', true ) );
 		}
-		require_once( ABSPATH . 'wp-admin/includes/file.php' );
 
-		WP_Filesystem();
+		if ( true === $purge_all_html_folder ) {
+			$wp_filesystem = breeze_get_filesystem();
 
-		$cache_path = breeze_get_cache_base_path( is_network_admin() );
-		$wp_filesystem->rmdir( untrailingslashit( $cache_path ), true );
+			$cache_path = breeze_get_cache_base_path( is_network_admin() );
+			$wp_filesystem->rmdir( untrailingslashit( $cache_path ), true );
+		}
 
-		if ( true === $flush_cache && ! empty( $post ) ) {
+		if ( true === $flush_cache && ! empty( $post ) && is_object( $post ) ) {
 			$post_type = get_post_type( $post->ID );
 
 			$flush_cache         = true;
@@ -356,7 +860,7 @@ class Breeze_PurgeCache {
 				'tribe_events',
 				'shop_order',
 			);
-			if ( in_array( $post_type, $ignore_object_cache ) ) {
+			if ( in_array( $post_type, $ignore_object_cache, true ) ) {
 				$flush_cache = false;
 			}
 		}
@@ -365,14 +869,11 @@ class Breeze_PurgeCache {
 			$flush_cache = false;
 		}
 
-		if ( function_exists( 'wp_cache_flush' ) && true === $flush_cache && true === $clear_ocp ) {
+		if ( ! empty( $post_id ) && true === $flush_cache && true === $clear_ocp ) {
 			if ( true === Breeze_CloudFlare_Helper::is_log_enabled() ) {
 				error_log( '######### PURGE OBJECT CACHE ###: ' . var_export( 'true', true ) );
 			}
-			#if ( ! defined( 'RedisCachePro\Version' ) && ! defined( 'WP_REDIS_VERSION' ) ) {
-			wp_cache_flush();
-			#}
-
+			self::clear_op_cache_for_posts( $post_id );
 		}
 	}
 
@@ -380,8 +881,8 @@ class Breeze_PurgeCache {
 
 	public function clean_up() {
 
-		global $wp_filesystem;
-		$file = untrailingslashit( WP_CONTENT_DIR ) . '/advanced-cache.php';
+		$wp_filesystem = breeze_get_filesystem();
+		$file          = untrailingslashit( WP_CONTENT_DIR ) . '/advanced-cache.php';
 
 		$ret = true;
 
@@ -416,6 +917,16 @@ class Breeze_PurgeCache {
 	}
 
 
+	/**
+	 * Flushes the entire object cache for the current context.
+	 *
+	 * This method resets the object cache, clearing all stored data. When executed
+	 * on a network admin screen, it will handle any additional logic specific to
+	 * network context (if required). Otherwise, it flushes the cache for the current
+	 * instance or site.
+	 *
+	 * @return bool True on success, false on failure.
+	 */
 	public static function __flush_object_cache() {
 		set_as_network_screen();
 
@@ -427,7 +938,108 @@ class Breeze_PurgeCache {
 		return wp_cache_flush();
 	}
 
+	/**
+	 * Clears the object cache associated with a specific post or custom post type.
+	 *
+	 * This method removes cached data for the given post ID, including post metadata
+	 * and any related term cache associated with the post.
+	 *
+	 * @param int $object_id The ID of the post or custom post type for which the cache should be cleared.
+	 *
+	 * @return void
+	 */
+	public static function clear_op_cache_for_posts( int $object_id ) {
+		if ( true === self::is_pro_plugin_ob_cache_enabled() ) {
+			return;
+		}
+
+		// POST/PAGE/CPT
+		// $object_id is $post_id
+		wp_cache_delete( $object_id, 'posts' );
+		wp_cache_delete( $object_id, 'post_meta' ); // If needed
+		wp_cache_delete( 'post_terms_' . $object_id, 'terms' ); //for term related to post
+	}
+
+	/**
+	 * Clears the object cache related to specific terms and their taxonomy.
+	 *
+	 * This method removes cached data for the given term, term taxonomy, and associated taxonomy
+	 * data, ensuring that outdated cached information is invalidated and updated.
+	 *
+	 * @param int $object_id The ID of the term for which the cache should be cleared.
+	 * @param int $tt_id The term taxonomy ID associated with the term.
+	 * @param string $taxonomy The taxonomy name related to the term.
+	 *
+	 * @return void
+	 */
+	private static function clear_op_cache_for_terms( int $object_id, int $tt_id, string $taxonomy ) {
+		if ( true === self::is_pro_plugin_ob_cache_enabled() ) {
+			return;
+		}
+
+		// TAXONOMY
+		// $object_id is term_id
+		wp_cache_delete( $object_id, 'terms' );
+		wp_cache_delete( $tt_id, 'term_taxonomy' );
+		#delete_transient( 'all_terms' ); //for all terms, if needed
+		$tax_cache_key = "{$taxonomy}_terms"; //dynamic based on current taxonomy
+		wp_cache_delete( $tax_cache_key, 'terms' ); //clear cache for taxonomy
+	}
+
+	/**
+	 * Clears the object cache related to a specific comment and its associated post.
+	 *
+	 * This method removes cached data for the given comment, resets queries related
+	 * to comments, clears the comment count cache, and clears the cache for the post
+	 * associated with the given comment.
+	 *
+	 * @param int $comment_id The ID of the comment for which the cache should be cleared.
+	 *
+	 * @return void
+	 */
+	private static function clear_op_cache_for_comments( int $comment_id ) {
+		if ( true === self::is_pro_plugin_ob_cache_enabled() ) {
+			return;
+		}
+		error_log( '$comment_id: ' . var_export( $comment_id, true ) );
+		wp_cache_delete( $comment_id, 'comment' );
+		wp_cache_delete( 'comment_query_1_' . get_the_ID(), 'comment' );
+		wp_cache_delete( 'get_comments_by_post_id_' . get_the_ID(), 'comment' );
+		//Clear all comments count cache, as it has changed
+		wp_cache_delete( 'comments-per-page', 'counts' );
+
+		// Clear the cache for the post the comment belongs to
+		$post_id = get_comment( $comment_id )->comment_post_ID;
+		wp_cache_delete( $post_id, 'posts' );
+		wp_cache_delete( $post_id, 'post_meta' ); // If needed
+	}
+
+	/**
+	 * Checks if object cache support is enabled by a Pro plugin.
+	 *
+	 * This method verifies the presence of object caching functionality typically provided
+	 * by Pro-level caching plugins, such as Redis Cache Pro or similar plugins.
+	 *
+	 * @return bool Returns true if a Pro plugin enabling object cache is detected, otherwise false.
+	 */
+	private static function is_pro_plugin_ob_cache_enabled(): bool {
+		// If Redis Pro is found, leave the object cache clear to it.
+		if ( defined( 'RedisCachePro\Version' ) || defined( 'WP_REDIS_VERSION' ) ) {
+			return true;
+		}
+
+		// if the function does not exist, block the calling of it.
+		if ( ! function_exists( 'wp_cache_delete' ) ) {
+			return true;
+		}
+		// Go ahead and clear the object cache.
+		return false;
+	}
 }
+
+// Outside the breeze-active guard: queued purges must still run when only the Varnish
+// auto-purge option is enabled, otherwise the queued batch would be dropped silently.
+add_action( 'breeze_purge_varnish_urls', array( 'Breeze_PurgeCache', 'purge_varnish_urls' ), 10, 1 );
 
 $breeze_basic_settings = Breeze_Options_Reader::get_option_value( 'breeze-active' );
 
