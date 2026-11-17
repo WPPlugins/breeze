@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Breeze
- * Description: Breeze is a WordPress cache plugin with extensive options to speed up your website. All the options including Varnish Cache are compatible with Cloudways hosting.
- * Version: 1.1.10
+ * Description: Breeze is a cache plugin with extensive options to speed up your website. All the options including Varnish Cache are compatible with Cloudways hosting.
+ * Version: 2.6.5
  * Text Domain: breeze
  * Domain Path: /languages
  * Author: Cloudways
@@ -37,7 +37,7 @@ if ( ! defined( 'BREEZE_PLUGIN_DIR' ) ) {
 	define( 'BREEZE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 }
 if ( ! defined( 'BREEZE_VERSION' ) ) {
-	define( 'BREEZE_VERSION', '1.1.10' );
+	define( 'BREEZE_VERSION', '2.6.5' );
 }
 if ( ! defined( 'BREEZE_SITEURL' ) ) {
 	define( 'BREEZE_SITEURL', get_site_url() );
@@ -47,6 +47,9 @@ if ( ! defined( 'BREEZE_MINIFICATION_CACHE' ) ) {
 }
 if ( ! defined( 'BREEZE_CACHEFILE_PREFIX' ) ) {
 	define( 'BREEZE_CACHEFILE_PREFIX', 'breeze_' );
+}
+if ( ! defined( 'BREEZE_MINIFICATION_EXTRA' ) ) {
+	define( 'BREEZE_MINIFICATION_EXTRA', WP_CONTENT_DIR . '/cache/breeze-extra/' );
 }
 if ( ! defined( 'BREEZE_CACHE_CHILD_DIR' ) ) {
 	define( 'BREEZE_CACHE_CHILD_DIR', '/cache/breeze-minification/' );
@@ -58,71 +61,229 @@ if ( ! defined( 'BREEZE_BASENAME' ) ) {
 	define( 'BREEZE_BASENAME', plugin_basename( __FILE__ ) );
 }
 
+if ( ! defined( 'BREEZE_PLUGIN_URL' ) ) {
+	// Usage BREEZE_PLUGIN_URL . "some_image.png" from plugin folder
+	define( 'BREEZE_PLUGIN_URL', plugins_url() . '/' . dirname( plugin_basename( __FILE__ ) ) . '/' );
+}
+
 define( 'BREEZE_CACHE_DELAY', true );
 define( 'BREEZE_CACHE_NOGZIP', true );
 define( 'BREEZE_ROOT_DIR', str_replace( BREEZE_WP_CONTENT_NAME, '', WP_CONTENT_DIR ) );
 
+// Explicitly load Action Scheduler (not autoloaded by Composer).
+// It's made this way because Action Scheduler requires WordPress to be loaded first.
+// If the library is loaded by other plugins, the conflcits are avoided because it made to load the latest version of the library.
+// And, it's backwards compatible between versions.
+if ( file_exists( BREEZE_PLUGIN_DIR . 'vendor/woocommerce/action-scheduler/action-scheduler.php' ) ) {
+	require_once BREEZE_PLUGIN_DIR . 'vendor/woocommerce/action-scheduler/action-scheduler.php';
+}
+
+// Options reader
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-options-reader.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-htaccess-settings.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-cloudflare-helper.php';
+
 // Compatibility checks
 require_once BREEZE_PLUGIN_DIR . 'inc/plugin-incompatibility/class-breeze-incompatibility-plugins.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/plugin-incompatibility/class-breeze-woocs-compatibility.php';
+// Check for if folder/files are writable.
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-file-permissions.php';
+// Review request banner. Loaded only on the Breeze settings page and for its button links.
+if ( is_admin() && ( ( isset( $_GET['page'] ) && 'breeze' === $_GET['page'] ) || ( isset( $_GET['action'] ) && 'breeze_review_notice' === $_GET['action'] ) ) ) {
+	require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-review-notice.php';
+}
+// AMP compatibility.
+require_once BREEZE_PLUGIN_DIR . 'inc/plugin-incompatibility/breeze-amp-compatibility.php';
 
 // Helper functions.
 require_once BREEZE_PLUGIN_DIR . 'inc/helpers.php';
 require_once BREEZE_PLUGIN_DIR . 'inc/functions.php';
 
-//action to purge cache
-require_once( BREEZE_PLUGIN_DIR . 'inc/cache/purge-varnish.php' );
-require_once( BREEZE_PLUGIN_DIR . 'inc/cache/purge-cache.php' );
-require_once( BREEZE_PLUGIN_DIR . 'inc/cache/purge-per-time.php' );
+
+// Handle Heartbeat options.
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-heartbeat-settings.php';
+
+// action to purge cache
+require_once BREEZE_PLUGIN_DIR . 'inc/cache/purge-varnish.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/cache/purge-cache.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/cache/purge-per-time.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/cache/class-purge-post-cache.php';
+
+// Stale-While-Revalidate: Background cache regeneration
+require_once BREEZE_PLUGIN_DIR . 'inc/cache/class-breeze-cache-preloader.php';
+\Breeze\Cache\Breeze_Cache_Preloader::init();
+
 // Handle post exclude if shortcode.
-require_once( BREEZE_PLUGIN_DIR . 'inc/class-exclude-pages-by-shortcode.php' );
+require_once BREEZE_PLUGIN_DIR . 'inc/class-exclude-pages-by-shortcode.php';
+// Handle the WP emoji library.
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-disable-emoji-option.php';
+// Prefetch URLs.
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-dns-prefetch.php';
 
 // Activate plugin hook
 register_activation_hook( __FILE__, array( 'Breeze_Admin', 'plugin_active_hook' ) );
-//Deactivate plugin hook
+// Deactivate plugin hook
 register_deactivation_hook( __FILE__, array( 'Breeze_Admin', 'plugin_deactive_hook' ) );
 
-require_once( BREEZE_PLUGIN_DIR . 'inc/breeze-admin.php' );
+require_once BREEZE_PLUGIN_DIR . 'inc/breeze-admin.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-prefetch.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-preload-fonts.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-one-click-optimization.php';
+
+
+// Load Store Local Files class.
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-store-files-locally.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-bulk-update.php';
+
+// Load Breeze Rollback Functionality.
+if ( isset( $_GET['page'] ) && 'breeze-rollback' === $_GET['page'] ) {
+	require_once BREEZE_PLUGIN_DIR . 'inc/rollback/class-breeze-rollback.php';
+}
+
+// Include cronjobs (Gravatars curently(
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-cache-cronjobs.php';
+$gravatars_enabled = Breeze_Options_Reader::get_option_value( 'breeze-store-gravatars-locally' );
+new Breeze_Cache_CronJobs( $gravatars_enabled );
+
+// Keep an indexed list of password-protected URLs for fast cache checks.
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-protected-urls-index.php';
+// Instantiate the protected URLs index.
+new Breeze_Protected_Urls_Index();
 
 if ( is_admin() || 'cli' === php_sapi_name() ) {
 
-	require_once( BREEZE_PLUGIN_DIR . 'inc/breeze-configuration.php' );
-	//config to cache
-	require_once( BREEZE_PLUGIN_DIR . 'inc/cache/config-cache.php' );
+	require_once BREEZE_PLUGIN_DIR . 'inc/breeze-configuration.php';
+	// config to cache
+	require_once BREEZE_PLUGIN_DIR . 'inc/cache/config-cache.php';
 
-	//cache when ecommerce installed
-	require_once( BREEZE_PLUGIN_DIR . 'inc/cache/ecommerce-cache.php' );
+	// cache when ecommerce installed
+	require_once BREEZE_PLUGIN_DIR . 'inc/cache/ecommerce-cache.php';
 	add_action(
 		'init',
 		function () {
 			new Breeze_Ecommerce_Cache();
+			Breeze_Query_Strings_Rules::when_woocommerce_settings_save();
 		},
 		0
 	);
 
-} else {
-	$cdn_conf        = breeze_get_option( 'cdn_integration' );
-	$basic_conf      = breeze_get_option( 'basic_settings' );
-	$config_advanced = breeze_get_option( 'advanced_settings' );
-
-	if ( ! empty( $cdn_conf['cdn-active'] )
-		 || ! empty( $basic_conf['breeze-minify-js'] )
-		 || ! empty( $basic_conf['breeze-minify-css'] )
-		 || ! empty( $basic_conf['breeze-minify-html'] )
-		 || ! empty( $config_advanced['breeze-defer-js'] )
-		 || ! empty( $config_advanced['breeze-move-to-footer-js'] )
+} elseif ( ! empty( Breeze_Options_Reader::get_option_value( 'cdn-active' ) )
+        || ! empty( Breeze_Options_Reader::get_option_value( 'breeze-html-doublecheck' ) )
+		|| ! empty( Breeze_Options_Reader::get_option_value( 'breeze-minify-js' ) )
+		|| ! empty( Breeze_Options_Reader::get_option_value( 'breeze-minify-css' ) )
+		|| ! empty( Breeze_Options_Reader::get_option_value( 'breeze-minify-html' ) )
+		|| ! empty( Breeze_Options_Reader::get_option_value( 'breeze-defer-js' ) )
+		|| ! empty( Breeze_Options_Reader::get_option_value( 'breeze-move-to-footer-js' ) )
+		|| ! empty( Breeze_Options_Reader::get_option_value( 'breeze-delay-all-js' ) )
+		|| ! empty( Breeze_Options_Reader::get_option_value( 'breeze-enable-js-delay' ) )
 	) {
-		// Call back ob start
-		ob_start( 'breeze_ob_start_callback' );
-	}
+
+		// Buffer only once WordPress has committed to rendering a page. Anything
+		// that streams a file (Gravity Forms downloads, PDF/CSV exports) runs and
+		// exits before this hook, so its bytes are never captured or rewritten.
+		add_action(
+			'template_redirect',
+			function () {
+				ob_start( 'breeze_ob_start_callback' );
+			},
+			PHP_INT_MAX
+		);
 }
+// Breeze API
+require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-api.php';
+$api_enabled = Breeze_Options_Reader::get_option_value( 'breeze-enable-api' );
+if ( $api_enabled ) {
+	$options = array(
+		'breeze-secure-api' => Breeze_Options_Reader::get_option_value( 'breeze-secure-api' ),
+		'breeze-api-token'  => Breeze_Options_Reader::get_option_value( 'breeze-api-token' ),
+
+	);
+	new Breeze_Api_Handler( $options );
+}
+
+/**
+ * Store files locally, First buffer controller to occur in this plugin
+ */
+add_action(
+	'template_redirect',
+	function () {
+		$host_files_enabled = ! empty( Breeze_Options_Reader::get_option_value( 'breeze-store-googlefonts-locally' ) );
+
+		if ( $host_files_enabled ) {
+			ob_start( 'breeze_ob_start_localfiles_callback' );
+		}
+	},
+	PHP_INT_MAX
+);
+
+// Keep the tracking vars Breeze removed from the request on WordPress redirects.
+add_filter( 'wp_redirect', array( 'Breeze_Query_Strings_Rules', 'add_stripped_vars_to_redirect' ), PHP_INT_MAX );
+
+// Compatibilities.
+require_once BREEZE_PLUGIN_DIR . 'inc/compatibility/class-breeze-the-events-calendar.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/compatibility/class-breeze-shortpixel-compatibility.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/compatibility/class-breeze-avada-cache.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/compatibility/class-breeze-elementor-template.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/compatibility/class-breeze-translatepress-compatibility.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/compatibility/class-breeze-wcml-compatibility.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/compatibility/class-breeze-curcy-compatibility.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/compatibility/class-breeze-aelia-compatibility.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/compatibility/class-breeze-weglot-compatibility.php';
+
+// Version Upgrade routines
+require_once BREEZE_PLUGIN_DIR . 'inc/upgrade.php';
+
+/**
+ * Buffer to work with the contents before any changes occured
+ *
+ * @param $buffer
+ *
+ * @return array|false|int|mixed|string|string[]
+ */
+function breeze_ob_start_localfiles_callback( $buffer ) {
+
+	// Store Files Locally
+	if ( class_exists( 'Breeze_Store_Files' ) ) {
+
+		$enabled_options = array();
+
+		$options = array(
+			'breeze-store-googlefonts-locally',
+		);
+
+		foreach ( $options as $option ) {
+			$enabled_options[ $option ] = Breeze_Options_Reader::get_option_value( $option );
+		}
+
+		$store_locally = new \Breeze_Store_Files();
+		$buffer        = $store_locally->init( $buffer, $enabled_options );
+	}
+
+	// Return content
+	return $buffer;
+}
+
 
 // Call back ob start - stack
 function breeze_ob_start_callback( $buffer ) {
-	$conf = breeze_get_option( 'cdn_integration' );
+
+	// Front-end only guard: never process admin, AJAX, or REST responses.
+	if (
+		is_admin() ||
+		wp_doing_ajax() ||
+		( defined( 'REST_REQUEST' ) && true === REST_REQUEST )
+	) {
+		return $buffer;
+	}
+
+	if ( ! empty( $_SERVER ) && ! empty( $_SERVER['REQUEST_URI'] ) && strpos( $_SERVER['REQUEST_URI'], 'context=edit' ) ) {
+		return $buffer;
+	}
+
 	// Get buffer from minify
 	$buffer = apply_filters( 'breeze_minify_content_return', $buffer );
 
-	if ( ! empty( $conf ) || ! empty( $conf['cdn-active'] ) ) {
+	if ( ! empty( Breeze_Options_Reader::get_option_value( 'cdn-active' ) ) ) {
 		// Get buffer after remove query strings
 		$buffer = apply_filters( 'breeze_cdn_content_return', $buffer );
 	}
@@ -131,22 +292,22 @@ function breeze_ob_start_callback( $buffer ) {
 	return $buffer;
 }
 
+require_once BREEZE_PLUGIN_DIR . 'views/option-tabs-loader.php';
 // Minify
 
-require_once( BREEZE_PLUGIN_DIR . 'inc/minification/breeze-minify-main.php' );
-require_once( BREEZE_PLUGIN_DIR . 'inc/minification/breeze-minification-cache.php' );
+require_once BREEZE_PLUGIN_DIR . 'inc/minification/breeze-minify-main.php';
+require_once BREEZE_PLUGIN_DIR . 'inc/minification/breeze-minification-cache.php';
 add_action(
 	'init',
 	function () {
 		new Breeze_Minify();
-
 	},
 	0
 );
 // CDN Integration
 if ( ! class_exists( 'Breeze_CDN_Integration' ) ) {
-	require_once( BREEZE_PLUGIN_DIR . 'inc/cdn-integration/breeze-cdn-integration.php' );
-	require_once( BREEZE_PLUGIN_DIR . 'inc/cdn-integration/breeze-cdn-rewrite.php' );
+	require_once BREEZE_PLUGIN_DIR . 'inc/cdn-integration/breeze-cdn-integration.php';
+	require_once BREEZE_PLUGIN_DIR . 'inc/cdn-integration/breeze-cdn-rewrite.php';
 	add_action(
 		'init',
 		function () {
@@ -158,229 +319,94 @@ if ( ! class_exists( 'Breeze_CDN_Integration' ) ) {
 
 // Refresh cache for ordered products.
 require_once BREEZE_PLUGIN_DIR . 'inc/class-breeze-woocommerce-product-cache.php';
-/**
- * This function will update htaccess files after the plugin update is done.
- *
- * This function runs when WordPress completes its upgrade process.
- * It iterates through each plugin updated to see if ours is included.
- *
- * The plugin must be active while updating, otherwise this will do nothing.
- *
- * @see https://codex.wordpress.org/Plugin_API/Action_Reference/upgrader_process_complete
- * @since 1.1.3
- *
- * @param array $upgrader_object
- * @param array $options
- */
-function breeze_after_plugin_update_done( $upgrader_object, $options ) {
-	// If an update has taken place and the updated type is plugins and the plugins element exists.
-	if ( $options['action'] == 'update' && $options['type'] == 'plugin' && isset( $options['plugins'] ) ) {
-		// Iterate through the plugins being updated and check if ours is there
-		foreach ( $options['plugins'] as $plugin ) {
-			if ( $plugin == BREEZE_BASENAME ) {
-				// If the install is multi-site, we will add the option for all the blogs.
-				if ( is_multisite() ) {
-					$blogs = get_sites();
-					if ( ! empty( $blogs ) ) {
-						foreach ( $blogs as $blog_data ) {
-							$blog_id = $blog_data->blog_id;
-							switch_to_blog( $blog_id );
-							// Add the option for each blog.
-							// The visit on any blog will trigger the update to happen.
-							add_option( 'breeze_new_update', 'yes', '', false );
+// WP-CLI commands
+require_once BREEZE_PLUGIN_DIR . 'inc/wp-cli/class-breeze-wp-cli-core.php';
 
-							restore_current_blog();
-						}
-					}
-				} else {
-					// Add a new option to inform the install that a new version was installed.
-					add_option( 'breeze_new_update', 'yes', '', false );
-				}
-			}
+
+// Minified bundles are intentionally kept when the cache is purged, so a page
+// held in the HTML/Varnish/CDN cache can never request a deleted asset. They are
+// removed only when their post is trashed or permanently deleted — the one
+// moment nothing can reference them anymore.
+add_action(
+	'before_delete_post',
+	function ( $post_id ) {
+		if ( class_exists( 'Breeze_MinificationCache' ) ) {
+			Breeze_MinificationCache::delete_post_minification( $post_id );
+		}
+	},
+	10,
+	1
+);
+add_action(
+	'wp_trash_post',
+	function ( $post_id ) {
+		if ( class_exists( 'Breeze_MinificationCache' ) ) {
+			Breeze_MinificationCache::delete_post_minification( $post_id );
+		}
+	},
+	10,
+	1
+);
+
+// Reclaim the minified bundles orphaned by the last purge, a grace window after
+// it. Traffic-triggered so it needs no WP-Cron, and it deletes only bundles no
+// render has referenced since that purge - everything still reachable from a
+// live page was stamped by the render that linked to it. Runs on real front-end
+// requests only (cached pages are served by the drop-in before this loads), so
+// it never adds work to the hot path.
+add_action(
+	'shutdown',
+	function () {
+		if ( is_admin()
+			|| ( defined( 'DOING_CRON' ) && DOING_CRON )
+			|| ( defined( 'DOING_AJAX' ) && DOING_AJAX )
+			|| ( defined( 'REST_REQUEST' ) && REST_REQUEST )
+			|| 'cli' === php_sapi_name()
+		) {
+			return;
+		}
+		if ( class_exists( 'Breeze_MinificationCache' ) ) {
+			Breeze_MinificationCache::maybe_sweep_orphans();
+		}
+	},
+	100
+);
+
+// WP-Cron backstop for the same cleanup. On sites where cron works this
+// guarantees it completes even without front-end traffic; the shutdown path
+// above stays as a fallback for sites where cron is disabled or unreliable.
+// Both go through maybe_sweep_orphans(), which runs once per purge, so they
+// never double-run.
+add_action(
+	'init',
+	function () {
+		if ( ! class_exists( 'Breeze_MinificationCache' ) ) {
+			return;
+		}
+		$enabled   = Breeze_MinificationCache::track_bundle_usage();
+		$scheduled = wp_next_scheduled( 'breeze_minify_sweep_cron' );
+		if ( $enabled && ! $scheduled ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', 'breeze_minify_sweep_cron' );
+		} elseif ( ! $enabled && $scheduled ) {
+			wp_unschedule_event( $scheduled, 'breeze_minify_sweep_cron' );
+		}
+	},
+	20
+);
+add_action(
+	'breeze_minify_sweep_cron',
+	function () {
+		if ( class_exists( 'Breeze_MinificationCache' ) ) {
+			Breeze_MinificationCache::maybe_sweep_orphans();
 		}
 	}
-}
-
-add_action( 'upgrader_process_complete', 'breeze_after_plugin_update_done', 10, 2 );
-
-/**
- * This function is checking on init if there is a need to update htaccess.
- */
-function breeze_check_for_new_version() {
-	// When permalinks are reset, we also reset the config files.
-	if ( isset( $_POST['permalink_structure'] ) || isset( $_POST['category_base'] ) ) {
-		check_admin_referer( 'update-permalink' );
-		// If the WP install is multi-site
-
-		global $wp_filesystem;
-		if ( empty( $wp_filesystem ) ) {
-			require_once( ABSPATH . '/wp-admin/includes/file.php' );
-			WP_Filesystem();
-		}
-
-		// import these file in front-end when required.
-		if ( ! class_exists( 'Breeze_Ecommerce_Cache' ) ) {
-			//cache when ecommerce installed
-			require_once( BREEZE_PLUGIN_DIR . 'inc/cache/ecommerce-cache.php' );
-		}
-
-		// import these file in front-end when required.
-		if ( ! class_exists( 'Breeze_ConfigCache' ) ) {
-			//config to cache
-			require_once( BREEZE_PLUGIN_DIR . 'inc/cache/config-cache.php' );
-		}
-
-		if ( is_multisite() ) {
-			// For multi-site we need to also reset the root config-file.
-			Breeze_ConfigCache::factory()->write_config_cache( true );
-
-			$blogs = get_sites();
-			if ( ! empty( $blogs ) ) {
-				foreach ( $blogs as $blog_data ) {
-					$blog_id = $blog_data->blog_id;
-					switch_to_blog( $blog_id );
-
-					// if the settings are inherited, then we do not need to refresh the config file.
-					$inherit_option = get_option( 'breeze_inherit_settings' );
-					$inherit_option = filter_var( $inherit_option, FILTER_VALIDATE_BOOLEAN );
-
-					// If the settings are not inherited from parent blog, then refresh the config file.
-					if ( false === $inherit_option ) {
-						// Refresh breeze-cache.php file
-						Breeze_ConfigCache::factory()->write_config_cache();
-					}
-
-					restore_current_blog();
-				}
-			}
-		} else {
-			// For single site.
-			// Refresh breeze-cache.php file
-			Breeze_ConfigCache::factory()->write_config_cache();
-		}
+);
+register_deactivation_hook(
+	__FILE__,
+	function () {
+		wp_clear_scheduled_hook( 'breeze_minify_sweep_cron' );
 	}
+);
 
-	// This process can also be started by Wp-CLI.
-	if ( ! empty( get_option( 'breeze_new_update', '' ) ) ) {
-		// This needs to happen only once.
-		if ( class_exists( 'Breeze_Configuration' ) && method_exists( 'Breeze_Configuration', 'update_htaccess' ) ) {
-			Breeze_Configuration::update_htaccess();
-
-		}
-
-		// import these file in front-end when required.
-		if ( ! class_exists( 'Breeze_Ecommerce_Cache' ) ) {
-			//cache when ecommerce installed
-			require_once( BREEZE_PLUGIN_DIR . 'inc/cache/ecommerce-cache.php' );
-		}
-
-		// import these file in front-end when required.
-		if ( ! class_exists( 'Breeze_ConfigCache' ) ) {
-			//config to cache
-			require_once( BREEZE_PLUGIN_DIR . 'inc/cache/config-cache.php' );
-		}
-
-		// If the WP install is multi-site
-		if ( is_multisite() ) {
-			// For multi-site we need to also reset the root config-file.
-			Breeze_ConfigCache::factory()->write_config_cache( true );
-
-			$blogs = get_sites();
-			if ( ! empty( $blogs ) ) {
-				foreach ( $blogs as $blog_data ) {
-					$blog_id = $blog_data->blog_id;
-					switch_to_blog( $blog_id );
-
-					// if the settings are inherited, then we do not need to refresh the config file.
-					$inherit_option = get_option( 'breeze_inherit_settings' );
-					$inherit_option = filter_var( $inherit_option, FILTER_VALIDATE_BOOLEAN );
-
-					// If the settings are not inherited from parent blog, then refresh the config file.
-					if ( false === $inherit_option ) {
-						// Refresh breeze-cache.php file
-						Breeze_ConfigCache::factory()->write_config_cache();
-					}
-
-					// Remove the option from all the blogs, meaning each one of them was already updated.
-					delete_option( 'breeze_new_update' );
-
-					restore_current_blog();
-				}
-			}
-		} else {
-			// For single site.
-
-			// Refresh breeze-cache.php file
-			Breeze_ConfigCache::factory()->write_config_cache();
-
-			delete_option( 'breeze_new_update' );
-		}
-	}
-}
-
-add_action( 'init', 'breeze_check_for_new_version', 99 );
-
-
-add_action( 'wp_login', 'refresh_config_files', 10, 2 );
-
-/**
- * Handles the config file reset.
- *
- * @param string $user_login $user->user_login
- * @param object $user WP_User
- *
- * @since 1.1.5
- */
-function refresh_config_files( $user_login, $user ) {
-	if ( in_array( 'administrator', (array) $user->roles, true ) ) {
-		//The user has the "administrator" role
-		global $wp_filesystem;
-		if ( empty( $wp_filesystem ) ) {
-			require_once( ABSPATH . '/wp-admin/includes/file.php' );
-			WP_Filesystem();
-		}
-		// import these file in front-end when required.
-		if ( ! class_exists( 'Breeze_Ecommerce_Cache' ) ) {
-			//cache when ecommerce installed
-			require_once( BREEZE_PLUGIN_DIR . 'inc/cache/ecommerce-cache.php' );
-		}
-
-		// import these file in front-end when required.
-		if ( ! class_exists( 'Breeze_ConfigCache' ) ) {
-			//config to cache
-			require_once( BREEZE_PLUGIN_DIR . 'inc/cache/config-cache.php' );
-		}
-		if ( is_multisite() ) {
-			$blogs = get_sites();
-			// For multi-site we need to also reset the root config-file.
-			Breeze_ConfigCache::factory()->write_config_cache( true );
-
-			if ( ! empty( $blogs ) ) {
-				foreach ( $blogs as $blog_data ) {
-					$blog_id = $blog_data->blog_id;
-					switch_to_blog( $blog_id );
-
-					// if the settings are inherited, then we do not need to refresh the config file.
-					$inherit_option = get_option( 'breeze_inherit_settings' );
-					$inherit_option = filter_var( $inherit_option, FILTER_VALIDATE_BOOLEAN );
-					// If the settings are not inherited from parent blog, then refresh the config file.
-					if ( false === $inherit_option ) {
-						// Refresh breeze-cache.php file
-						Breeze_ConfigCache::factory()->write_config_cache();
-					}
-					restore_current_blog();
-				}
-			}
-		} else {
-			$current_file = WP_CONTENT_DIR . '/breeze-config/breeze-config.php';
-			if ( file_exists( $current_file ) ) {
-				$current_data = include $current_file; //phpcs:ignore
-				if ( mb_strtolower( $current_data['homepage'] ) !== get_site_url() ) {
-					// For single site.
-					// Refresh breeze-cache.php file
-					Breeze_ConfigCache::factory()->write_config_cache();
-				}
-			}
-		}
-	}
-}
+// Reset to default
+add_action( 'breeze_reset_default', array( 'Breeze_Admin', 'plugin_deactive_hook' ), 80 );
